@@ -1,0 +1,18 @@
+---
+description: Keep Afterparty synced to GitHub after code changes
+alwaysApply: true
+---
+
+# GitHub sync (SWBANERJEE12/AfterParty)
+
+Remote: `https://github.com/SWBANERJEE12/AfterParty.git`, branch `master`.
+
+After completing substantive code or config changes in this repo:
+
+1. Run `git status` and ensure `.env`, `.env.local`, and other secrets are **not** staged.
+2. Commit with a clear message when the user asked for ongoing GitHub sync or at the end of a completed task.
+3. Push with `git push origin master` (no force push).
+
+Do not commit API keys, Supabase service-role keys, or credentials. `.env.example` only uses placeholders.
+
+If push fails (auth, network), report the error and give the user exact steps; do not claim success.
