@@ -1,9 +1,22 @@
 import type { MovieMeta } from '../shared/movies'
 
-export async function fetchOmdbStatus(): Promise<{ configured: boolean }> {
-  const res = await fetch('/api/omdb/status')
-  if (!res.ok) return { configured: false }
-  return res.json()
+export type OmdbStatusResult =
+  | { configured: true }
+  | { configured: false; reason: 'not_configured' | 'api_unreachable' }
+
+export async function fetchOmdbStatus(): Promise<OmdbStatusResult> {
+  try {
+    const res = await fetch('/api/omdb/status', { headers: { Accept: 'application/json' } })
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!res.ok || !contentType.includes('application/json')) {
+      return { configured: false, reason: 'api_unreachable' }
+    }
+    const data = (await res.json()) as { configured?: boolean }
+    if (data.configured) return { configured: true }
+    return { configured: false, reason: 'not_configured' }
+  } catch {
+    return { configured: false, reason: 'api_unreachable' }
+  }
 }
 
 export async function searchOmdb(q: string): Promise<{ results: MovieMeta[]; error?: string }> {

@@ -44,6 +44,20 @@ Loaded when the Express server starts (`import './loadEnv.ts'` runs first in `se
 
 See `.env.example`.
 
+## Vercel (production)
+
+The Vite app is static; **movie metadata runs on serverless API** (`api/index.ts` → shared `server/apiApp.ts`). `vercel.json` rewrites `/api/*` to that function and serves the SPA from `dist/`.
+
+1. Import the GitHub repo in [Vercel](https://vercel.com) (default build: `npm run build`, output: `dist`).
+2. **Project → Settings → Environment Variables** — add for **Production** (and Preview if you want):
+   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (client build-time)
+   - `OMDB_API_KEY` (server-only; **no** `VITE_` prefix)
+   - `YOUTUBE_API_KEY` (server-only; trailers)
+3. **Redeploy** after changing env vars (Vercel does not inject new secrets into old deployments).
+4. Smoke test: `GET https://<your-deployment>/api/omdb/status` → `{"configured":true}` when the key is set.
+
+Socket.IO / legacy blockbuster rooms still require a long-running Node server (`npm run dev` or a separate host); they are not available on Vercel serverless.
+
 ## Supabase migrations (run in order)
 
 Dashboard → **SQL** → run each file in `supabase/migrations/` (see `supabase/README.md`).

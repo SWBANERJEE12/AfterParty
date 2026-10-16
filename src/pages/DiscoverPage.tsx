@@ -92,6 +92,7 @@ export function DiscoverPage() {
   const roomContext = roomSession?.activeRoomId ?? null
 
   const [omdbOk, setOmdbOk] = useState<boolean | null>(null)
+  const [omdbIssue, setOmdbIssue] = useState<'not_configured' | 'api_unreachable' | null>(null)
   const [featured, setFeatured] = useState<MovieMeta | null>(null)
   const [rows, setRows] = useState<Record<string, MovieMeta[]>>({})
   const [rowLoading, setRowLoading] = useState(true)
@@ -117,7 +118,15 @@ export function DiscoverPage() {
   }, [recommendedMovies, recommendedFocus])
 
   useEffect(() => {
-    fetchOmdbStatus().then((s) => setOmdbOk(s.configured))
+    fetchOmdbStatus().then((s) => {
+      if (s.configured) {
+        setOmdbOk(true)
+        setOmdbIssue(null)
+      } else {
+        setOmdbOk(false)
+        setOmdbIssue(s.reason)
+      }
+    })
     fetchTrailerStatus().then((s) => setTrailersConfigured(s.configured))
   }, [])
 
@@ -233,8 +242,18 @@ export function DiscoverPage() {
 
       {omdbOk === false && (
         <div className="mx-auto mt-4 max-w-6xl rounded-lg border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
-          OMDB_API_KEY is not set on the Express server. Start <code>npm run dev</code> (web + api) and add the key to{' '}
-          <code>.env</code>.
+          {omdbIssue === 'api_unreachable' ? (
+            <>
+              Movie API is not reachable. On Vercel, deploy with the <code>api/</code> serverless handler (see{' '}
+              <code>vercel.json</code>) and redeploy after setting environment variables.
+            </>
+          ) : (
+            <>
+              <code>OMDB_API_KEY</code> is missing on the server. Locally, add it to <code>.env</code> and run{' '}
+              <code>npm run dev</code>. On Vercel, set <code>OMDB_API_KEY</code> under Project → Settings → Environment
+              Variables (Production), then redeploy. Never use a <code>VITE_</code> prefix for this key.
+            </>
+          )}
         </div>
       )}
 

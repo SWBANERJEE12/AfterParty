@@ -52,7 +52,7 @@ export function HomePage() {
   const trailer = useTrailerModal()
 
   useEffect(() => {
-    fetchOmdbStatus().then((s) => setOmdbOk(s.configured))
+    fetchOmdbStatus().then((s) => setOmdbOk(s.configured ? true : false))
     fetchTrailerStatus().then((s) => setTrailersConfigured(s.configured))
   }, [])
 
@@ -107,7 +107,8 @@ export function HomePage() {
 
       {omdbOk === false && (
         <p className="text-sm text-amber-200/90">
-          Movie metadata requires <code>OMDB_API_KEY</code> on the Express server. Run <code>npm run dev</code>.
+          Movie metadata requires <code>OMDB_API_KEY</code> on the server API. Locally run <code>npm run dev</code>; on
+          Vercel set <code>OMDB_API_KEY</code> in project environment variables and redeploy.
         </p>
       )}
 
