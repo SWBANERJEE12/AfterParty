@@ -1,0 +1,57 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-accent: #fe4401;
+}
+
+:root {
+  --color-fg: #f5f5f5;
+  --color-surface: rgba(15, 23, 42, 0.65);
+  --color-surface-elevated: rgba(15, 23, 42, 0.85);
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-muted: #9ca3af;
+  --bg-fallback: #0f172a;
+  --bg-gradient-top: #000000;
+  --bg-gradient-bottom: #0f172a;
+}
+
+html {
+  height: 100%;
+  background-color: var(--bg-fallback);
+  background-image: linear-gradient(to bottom, var(--bg-gradient-top) 0%, var(--bg-gradient-bottom) 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  min-height: 100dvh;
+  width: 100%;
+  background: transparent;
+  color: var(--color-fg);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Full-viewport shell — gradient lives on html (one paint, no blur) */
+.afterparty-gradient {
+  min-height: 100dvh;
+  width: 100%;
+}
+
+.glass-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "afterparty",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"npm run dev:server\"",
+    "dev:legacy": "concurrently -n client,server -c blue,magenta \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "check:supabase": "tsx scripts/check-supabase.ts",
+    "test:trailer-matching": "tsx scripts/test-trailer-matching.ts",
+    "test:playback-sync": "tsx scripts/test-playback-sync.ts",
+    "test:playback-latency-sim": "tsx scripts/test-playback-latency-sim.ts",
+    "test:host-local-video": "tsx scripts/test-host-local-video.ts",
+    "test:playback-action-queue": "tsx scripts/test-playback-action-queue.ts",
+    "test:file-transfer": "tsx scripts/test-file-transfer.ts",
+    "test:room-capacity": "tsx scripts/test-room-capacity.ts",
+    "test:late-join-pending": "tsx scripts/test-late-join-pending.ts",
+    "test:vote-rules": "tsx scripts/test-vote-rules.ts",
+    "test:discover-recommendations": "tsx scripts/test-discover-recommendations.ts",
+    "test:room-navigation": "tsx scripts/test-room-navigation.ts",
+    "check:server-env": "tsx scripts/check-server-env.ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.1",
+    "@supabase/supabase-js": "^2.117.3",
+    "@types/three": "^0.186.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "fuse.js": "^7.5.0",
+    "livekit-server-sdk": "^2.13.0",
+    "ogl": "^1.0.11",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.6.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^9.2.1",
+    "oxlint": "^1.81.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.20.5",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
