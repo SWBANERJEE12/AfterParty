@@ -1,9 +1,9 @@
-import './loadEnv.ts'
+import './loadEnv'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
-import { createApiApp } from './apiApp.ts'
-import { AVATAR_COLORS } from '../src/shared/avatarColors.ts'
-import { EMPTY_VOTE_STATE, type VoteState } from '../src/shared/movies.ts'
+import { createApiApp } from './apiApp'
+import { AVATAR_COLORS } from '../src/shared/avatarColors'
+import { EMPTY_VOTE_STATE, type VoteState } from '../src/shared/movies'
 import type {
   ClientToServerEvents,
   JoinedRoomPayload,
@@ -11,10 +11,10 @@ import type {
   RoomErrorCode,
   ServerToClientEvents,
   WorldLocation,
-} from '../src/shared/protocol.ts'
-import { MAX_ROOM_PLAYERS } from '../src/shared/protocol.ts'
-import { LAYOUTS, resolveSpawn } from '../src/game/world/layouts.ts'
-import { logServerConfigOnStartup } from './serverConfig.ts'
+} from '../src/shared/protocol'
+import { MAX_ROOM_PLAYERS } from '../src/shared/protocol'
+import { LAYOUTS, resolveSpawn } from '../src/game/world/layouts'
+import { logServerConfigOnStartup } from './serverConfig'
 
 const PORT = Number(process.env.PORT) || 3001
 const SHORTLIST_MAX = 5
@@ -50,7 +50,7 @@ function snapshotList(room: Room): PlayerSnapshot[] {
 }
 
 function nextSlot(room: Room): number | null {
-  const used = new Set(room.players.values().map((p) => p.slot))
+  const used = new Set([...room.players.values()].map((p) => p.slot))
   for (let i = 0; i < MAX_ROOM_PLAYERS; i++) {
     if (!used.has(i)) return i
   }

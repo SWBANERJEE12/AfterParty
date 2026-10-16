@@ -1,12 +1,12 @@
 import cors from 'cors'
 import express from 'express'
-import { CATALOG_IMDB_IDS } from './movieCatalog.ts'
-import { fetchByImdbId, getBlockbusterShelfMovies } from './omdb.ts'
-import { searchMovies } from './tmdb.ts'
-import { issueLivekitToken, livekitStatus } from './livekit.ts'
-import { createRateLimiter } from './rateLimit.ts'
-import { trailerByImdbId, trailerReportEmbedFailure, trailerStatus } from './trailers.ts'
-import { omdbRow, omdbSearch, omdbStatus, omdbTitle } from './watchMovies.ts'
+import { CATALOG_IMDB_IDS } from './movieCatalog'
+import { fetchByImdbId, getBlockbusterShelfMovies } from './omdb'
+import { searchMovies } from './tmdb'
+import { issueLivekitToken, livekitStatus } from './livekit'
+import { createRateLimiter } from './rateLimit'
+import { trailerByImdbId, trailerReportEmbedFailure, trailerStatus } from './trailers'
+import { omdbRow, omdbSearch, omdbStatus, omdbTitle } from './watchMovies'
 
 /** HTTP API only (no Socket.IO). Used by local Express and Vercel serverless. */
 export function createApiApp() {

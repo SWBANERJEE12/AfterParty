@@ -1,5 +1,5 @@
-import '../server/loadEnv.ts'
-import { createApiApp } from '../server/apiApp.ts'
+import '../server/loadEnv'
+import { createApiApp } from '../server/apiApp'
 
 const app = createApiApp()
 

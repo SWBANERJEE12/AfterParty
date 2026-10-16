@@ -1,4 +1,4 @@
-import { isEnvSet, listEnvFilesPresent } from './loadEnv.ts'
+import { isEnvSet, listEnvFilesPresent } from './loadEnv'
 
 export type ServerConfigDiagnostic = {
   omdbApiKey: boolean

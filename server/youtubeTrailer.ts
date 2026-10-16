@@ -1,4 +1,4 @@
-import { isEnvSet } from './loadEnv.ts'
+import { isEnvSet } from './loadEnv'
 
 const YOUTUBE_SEARCH = 'https://www.googleapis.com/youtube/v3/search'
 const YOUTUBE_VIDEOS = 'https://www.googleapis.com/youtube/v3/videos'

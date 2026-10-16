@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.api.json",
+  "include": [
+    "./**/*.ts",
+    "../server/**/*.ts",
+    "../src/shared/movies.ts",
+    "../src/shared/avatarColors.ts",
+    "../src/shared/protocol.ts",
+    "../src/game/world/**/*.ts"
+  ],
+  "exclude": ["../server/index.ts"]
+}

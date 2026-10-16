@@ -1,5 +1,5 @@
-import type { MovieMeta } from '../src/shared/movies.ts'
-import { omdbConfigured, searchMoviesOmdb } from './omdb.ts'
+import type { MovieMeta } from '../src/shared/movies'
+import { omdbConfigured, searchMoviesOmdb } from './omdb'
 
 const FALLBACK_MOVIES: MovieMeta[] = [
   {
