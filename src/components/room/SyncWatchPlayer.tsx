@@ -53,8 +53,22 @@ export function SyncWatchPlayer({
     channel,
     realtimeConnected,
   )
+  const { applyHostAction, refresh: refreshPlayback, reportDrift } = playback
+
+  const applyHostActionRef = useRef(applyHostAction)
+  applyHostActionRef.current = applyHostAction
+  const refreshPlaybackRef = useRef(refreshPlayback)
+  refreshPlaybackRef.current = refreshPlayback
+  const reportDriftRef = useRef(reportDrift)
+  reportDriftRef.current = reportDrift
+  const playbackStateRef = useRef(playback.state)
+  playbackStateRef.current = playback.state
+  const clockOffsetRef = useRef(playback.clockOffsetMs)
+  clockOffsetRef.current = playback.clockOffsetMs
 
   const [sourceMode, setSourceMode] = useState<'trailer' | 'file'>('trailer')
+  const [ytPlayerReady, setYtPlayerReady] = useState(false)
+  const trailerLoadGenRef = useRef(0)
   const [hostMediaPreparing, setHostMediaPreparing] = useState(false)
   const [viewerSyncEnabled, setViewerSyncEnabled] = useState(false)
   const pendingPlaybackRef = useRef(new PendingPlaybackBuffer())
@@ -72,7 +86,8 @@ export function SyncWatchPlayer({
     membershipReady,
   )
 
-  const ytContainerRef = useRef<HTMLDivElement>(null)
+  const ytContainerRef = useRef<HTMLDivElement | null>(null)
+  const [ytContainerEl, setYtContainerEl] = useState<HTMLDivElement | null>(null)
   const ytPlayerRef = useRef<YTPlayer | null>(null)
   const [ytError, setYtError] = useState<string | null>(null)
   const [selectingTrailer, setSelectingTrailer] = useState(false)
@@ -94,7 +109,7 @@ export function SyncWatchPlayer({
       const msg = raw as { payload?: { imdbId?: string; title?: string; youtubeVideoId?: string } }
       const p = msg.payload
       if (!p?.youtubeVideoId) return
-      void playback.applyHostAction({
+      void applyHostActionRef.current({
         type: 'select_source',
         sourceType: 'youtube_trailer',
         imdbId: p.imdbId,
@@ -103,12 +118,15 @@ export function SyncWatchPlayer({
         mediaSessionId: crypto.randomUUID(),
       })
     }
-    ;(channel as { on: (t: string, f: object, cb: (p: unknown) => void) => void }).on(
-      'broadcast',
-      { event: 'play_proposed_trailer' },
-      handler as (p: unknown) => void,
-    )
-  }, [channel, membershipReady, isHost, playback])
+    const ch = channel as {
+      on: (t: string, f: object, cb: (p: unknown) => void) => void
+      off?: (t: string, f: object, cb: (p: unknown) => void) => void
+    }
+    ch.on('broadcast', { event: 'play_proposed_trailer' }, handler as (p: unknown) => void)
+    return () => {
+      ch.off?.('broadcast', { event: 'play_proposed_trailer' }, handler as (p: unknown) => void)
+    }
+  }, [channel, membershipReady, isHost])
 
   useEffect(() => {
     publishedReadyForSessionRef.current = null
@@ -128,13 +146,13 @@ export function SyncWatchPlayer({
     if (isHost || media.viewerFileLoadState !== 'ready' || viewerInitializedRef.current) return
 
     const runInit = async () => {
-      const fresh = await playback.refresh()
+      const fresh = await refreshPlaybackRef.current()
       const buffered = pendingPlaybackRef.current.peek()
       const s =
         fresh && buffered && buffered.revision > fresh.revision
           ? buffered
-          : (fresh ?? buffered ?? playback.state)
-      const expected = expectedPositionSec(s, Date.now(), playback.clockOffsetMs)
+          : (fresh ?? buffered ?? playbackStateRef.current)
+      const expected = expectedPositionSec(s, Date.now(), clockOffsetRef.current)
       suppressLocalBroadcast.current = true
       media.applyViewerPlaybackToVideo('seek', expected, s.playbackRate)
       if (s.status === 'playing') {
@@ -152,38 +170,43 @@ export function SyncWatchPlayer({
     }
 
     void runInit()
-  }, [
-    isHost,
-    media.viewerFileLoadState,
-    media,
-    playback,
-    suppressLocalBroadcast,
-  ])
+  }, [isHost, media.viewerFileLoadState, media, suppressLocalBroadcast])
 
   useEffect(() => {
     if (isHost) return
     const off = media.onViewerFileReady(() => {
       if (viewerInitializedRef.current) return
-      void playback.refresh()
+      void refreshPlaybackRef.current()
     })
     return () => {
       off()
     }
-  }, [isHost, media, playback])
+  }, [isHost, media])
 
   const loadTrailer = useCallback(
     async (movie: MovieMeta) => {
       if (!isHost || !movie.imdbId) return
+      const loadGen = ++trailerLoadGenRef.current
       setSelectingTrailer(true)
       setYtError(null)
-      const trailer = await fetchMovieTrailer(movie.imdbId)
+      let trailer
+      try {
+        trailer = await fetchMovieTrailer(movie.imdbId)
+      } catch {
+        if (loadGen === trailerLoadGenRef.current) {
+          setSelectingTrailer(false)
+          setYtError('Trailer lookup failed. Try again.')
+        }
+        return
+      }
+      if (loadGen !== trailerLoadGenRef.current) return
       setSelectingTrailer(false)
       if (!trailer.videoId) {
         setYtError(trailer.message ?? 'Trailer unavailable')
         return
       }
       const sessionId = crypto.randomUUID()
-      await playback.applyHostAction({
+      const res = await applyHostAction({
         type: 'select_source',
         sourceType: 'youtube_trailer',
         imdbId: movie.imdbId,
@@ -191,8 +214,11 @@ export function SyncWatchPlayer({
         youtubeVideoId: trailer.videoId,
         mediaSessionId: sessionId,
       })
+      if (!res.ok && loadGen === trailerLoadGenRef.current) {
+        setYtError(res.error)
+      }
     },
-    [isHost, playback],
+    [isHost, applyHostAction],
   )
 
   const searchAndLoadTrailer = useCallback(async () => {
@@ -251,16 +277,14 @@ export function SyncWatchPlayer({
     }
     publishedReadyForSessionRef.current = sid
     const duration = media.hostDurationSec
-    void playback
-      .applyHostAction({
-        type: 'ready',
-        positionSec: 0,
-        status: 'paused',
-        ...(duration != null ? { durationSec: duration } : {}),
-      })
-      .finally(() => setHostMediaPreparing(false))
+    void applyHostAction({
+      type: 'ready',
+      positionSec: 0,
+      status: 'paused',
+      ...(duration != null ? { durationSec: duration } : {}),
+    }).finally(() => setHostMediaPreparing(false))
   }, [
-    playback,
+    applyHostAction,
     media.hostFileLoadState,
     media.hostDurationSec,
     playback.state.sourceType,
@@ -279,7 +303,7 @@ export function SyncWatchPlayer({
       publishedReadyForSessionRef.current = null
       const sessionId = crypto.randomUUID()
       attachAfterRpcRef.current = { sessionId, file }
-      const res = await playback.applyHostAction({
+      const res = await applyHostAction({
         type: 'select_source',
         sourceType: 'host_media',
         mediaSessionId: sessionId,
@@ -290,50 +314,63 @@ export function SyncWatchPlayer({
         setYtError(res.error)
       }
     },
-    [isHost, playback],
+    [isHost, applyHostAction],
   )
 
+  const youtubeVideoId = playback.state.youtubeVideoId
+  const youtubeSource = playback.state.sourceType === 'youtube_trailer'
+
   useEffect(() => {
-    if (playback.state.sourceType !== 'youtube_trailer' || !playback.state.youtubeVideoId) {
+    if (!youtubeSource || !youtubeVideoId) {
+      setYtPlayerReady(false)
       ytPlayerRef.current?.destroy()
       ytPlayerRef.current = null
       return
     }
-    const el = ytContainerRef.current
+    const el = ytContainerEl
     if (!el) return
     let cancelled = false
-    void createYoutubePlayer(el, playback.state.youtubeVideoId, {
-      onError: (code) => setYtError(`YouTube error (${code})`),
+    setYtPlayerReady(false)
+    void createYoutubePlayer(el, youtubeVideoId, {
+      onError: (code) => {
+        if (!cancelled) setYtError(`YouTube error (${code})`)
+      },
       onStateChange: (st, player) => {
         if (!isHost || suppressLocalBroadcast.current) return
         const YT = window.YT?.PlayerState
         if (!YT) return
         if (st === YT.BUFFERING) {
-          void playback.applyHostAction({
+          void applyHostActionRef.current({
             type: 'buffering',
             positionSec: player.getCurrentTime(),
           })
         }
       },
-    }).then((player) => {
-      if (cancelled) {
-        player.destroy()
-        return
-      }
-      ytPlayerRef.current = player
-      setYtError(null)
     })
+      .then((player) => {
+        if (cancelled) {
+          player.destroy()
+          return
+        }
+        ytPlayerRef.current = player
+        setYtPlayerReady(true)
+        setYtError(null)
+      })
+      .catch(() => {
+        if (!cancelled) setYtError('Could not embed trailer. Try another title.')
+      })
     return () => {
       cancelled = true
+      setYtPlayerReady(false)
       ytPlayerRef.current?.destroy()
       ytPlayerRef.current = null
     }
-  }, [playback.state.sourceType, playback.state.youtubeVideoId, isHost, suppressLocalBroadcast, playback])
+  }, [youtubeSource, youtubeVideoId, isHost, ytContainerEl])
 
   useEffect(() => {
     const player = ytPlayerRef.current
     const s = playback.state
-    if (!player || s.sourceType !== 'youtube_trailer') return
+    if (!player || !ytPlayerReady || s.sourceType !== 'youtube_trailer') return
     if (
       isStaleAction(s.revision, s.actionId, lastActionRef.current.revision, lastActionRef.current.actionId)
     ) {
@@ -355,17 +392,29 @@ export function SyncWatchPlayer({
     window.setTimeout(() => {
       suppressLocalBroadcast.current = false
     }, 100)
-  }, [playback.state, playback.clockOffsetMs, suppressLocalBroadcast])
+  }, [
+    playback.state.revision,
+    playback.state.actionId,
+    playback.state.status,
+    playback.state.playbackRate,
+    playback.state.sourceType,
+    playback.clockOffsetMs,
+    ytPlayerReady,
+    suppressLocalBroadcast,
+  ])
 
   useEffect(() => {
+    if (!youtubeSource) return
     const id = window.setInterval(() => {
       const player = ytPlayerRef.current
-      const s = playback.state
-      if (!player || s.sourceType !== 'youtube_trailer' || s.status === 'buffering') return
-      const expected = expectedPositionSec(s, Date.now(), playback.clockOffsetMs)
+      const s = playbackStateRef.current
+      if (!player || !ytPlayerReady || s.sourceType !== 'youtube_trailer' || s.status === 'buffering') {
+        return
+      }
+      const expected = expectedPositionSec(s, Date.now(), clockOffsetRef.current)
       const actual = player.getCurrentTime()
       const plan = planDriftCorrection(expected, actual, s.status, true)
-      playback.reportDrift(plan.driftMs, plan.kind === 'none' ? 'synced' : 'correcting')
+      reportDriftRef.current(plan.driftMs, plan.kind === 'none' ? 'synced' : 'correcting')
       if (plan.kind === 'seek' && Math.abs(plan.driftMs) > DRIFT_HARD_MS && !isHost) {
         suppressLocalBroadcast.current = true
         player.seekTo(plan.positionSec, true)
@@ -377,7 +426,7 @@ export function SyncWatchPlayer({
       }
     }, 750)
     return () => window.clearInterval(id)
-  }, [playback, isHost, suppressLocalBroadcast])
+  }, [youtubeSource, ytPlayerReady, isHost])
 
   const onApplyHostVideo = useCallback(
     (status: typeof playback.state.status, positionSec: number, rate: number) => {
@@ -418,7 +467,7 @@ export function SyncWatchPlayer({
     state: playback.state,
     getVideo: () => document.querySelector<HTMLVideoElement>('video[data-host-local-video]'),
     applyingRemote: suppressLocalBroadcast,
-    onDrift: playback.reportDrift,
+    onDrift: reportDrift,
     onApplyPlayPauseSeek: onApplyHostVideo,
   })
 
@@ -433,7 +482,7 @@ export function SyncWatchPlayer({
     state: playback.state,
     getVideo: () => document.querySelector<HTMLVideoElement>('video[data-viewer-local-video]'),
     applyingRemote: suppressLocalBroadcast,
-    onDrift: playback.reportDrift,
+    onDrift: reportDrift,
     onApplyPlayPauseSeek: onApplyViewerVideo,
   })
 
@@ -450,7 +499,7 @@ export function SyncWatchPlayer({
       }
       if (type === 'skip_forward') pos = (pos ?? 0) + 10
       if (type === 'skip_back') pos = Math.max(0, (pos ?? 0) - 10)
-      const res = await playback.applyHostAction({ type, positionSec: pos })
+      const res = await applyHostAction({ type, positionSec: pos })
       if (!res.ok) return
       const src = res.state.sourceType
       if (src === 'host_media') {
@@ -466,7 +515,7 @@ export function SyncWatchPlayer({
         if (pos != null) player.seekTo(pos, true)
       }
     },
-    [isHost, playback, media],
+    [isHost, applyHostAction, media, playback.state.sourceType, playback.state.positionSec],
   )
 
   const togglePlay = useCallback(() => {
@@ -520,7 +569,7 @@ export function SyncWatchPlayer({
           : expectedPositionSec(playback.state, Date.now(), playback.clockOffsetMs)
 
   const timelineReady =
-    playback.state.sourceType === 'youtube_trailer' ||
+    (playback.state.sourceType === 'youtube_trailer' && ytPlayerReady) ||
     (playback.state.sourceType === 'host_media' &&
       (isHost ? media.hostFileLoadState === 'ready' : media.viewerFileLoadState === 'ready'))
 
@@ -659,7 +708,20 @@ export function SyncWatchPlayer({
         onTogglePlay={togglePlay}
       >
         {playback.state.sourceType === 'youtube_trailer' && (
-          <div ref={ytContainerRef} className="absolute inset-0 h-full w-full" />
+          <>
+            <div
+              ref={(node) => {
+                ytContainerRef.current = node
+                setYtContainerEl(node)
+              }}
+              className="absolute inset-0 h-full w-full"
+            />
+            {!ytPlayerReady && !ytError && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 text-sm text-white/80">
+                Loading trailer…
+              </div>
+            )}
+          </>
         )}
         {showHostVideo && (
           <video

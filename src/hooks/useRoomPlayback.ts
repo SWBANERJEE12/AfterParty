@@ -200,7 +200,10 @@ export function useRoomPlayback(
   )
 
   const reportDrift = useCallback((driftMs: number, syncStatus: PlaybackDiagnostics['syncStatus']) => {
-    setDiag((d) => ({ ...d, driftMs, syncStatus }))
+    setDiag((d) => {
+      if (d.driftMs === driftMs && d.syncStatus === syncStatus) return d
+      return { ...d, driftMs, syncStatus }
+    })
   }, [])
 
   return {
