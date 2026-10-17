@@ -250,8 +250,8 @@ export function DiscoverPage() {
               Movie API is not reachable
               {omdbHttpStatus != null ? ` (HTTP ${omdbHttpStatus})` : ''}. The browser should call same-origin{' '}
               <code>/api/omdb/status</code> and receive JSON — if you see HTML, the Vercel function is not handling{' '}
-              <code>/api/*</code>. Redeploy after the latest <code>api/[...path].ts</code> handler is on{' '}
-              <code>master</code>.
+              <code>/api/*</code>. Ensure <code>vercel.json</code> rewrites <code>/api/(.*)</code> to{' '}
+              <code>api/index.ts</code> and redeploy <code>master</code>.
             </>
           ) : (
             <>

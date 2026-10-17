@@ -81,7 +81,7 @@ Runs Vite (`http://localhost:5173`) and Express (`http://localhost:3001`) with `
 ## Deploy on Vercel
 
 - Frontend: Vite build output in `dist/`.
-- API: `api/[...path].ts` (same routes as local Express under `/api/*`). Configure **`OMDB_API_KEY`** and **`YOUTUBE_API_KEY`** in Vercel project environment variables (server-only — never `VITE_OMDB_*`). Redeploy after adding secrets. Details: [SETUP.md](./SETUP.md#vercel-production).
+- API: `api/index.ts` with `vercel.json` rewrite `/api/(.*)` → `/api` (same routes as local Express). Configure **`OMDB_API_KEY`** and **`YOUTUBE_API_KEY`** in Vercel project environment variables (server-only — never `VITE_OMDB_*`). Redeploy after adding secrets. Details: [SETUP.md](./SETUP.md#vercel-production).
 
 ## Build & tests
 

@@ -46,7 +46,7 @@ See `.env.example`.
 
 ## Vercel (production)
 
-The Vite app is static; **movie metadata runs on serverless API** (`api/[...path].ts` → shared `server/apiApp.ts`). `vercel.json` rewrites `/api/*` to that function and serves the SPA from `dist/`.
+The Vite app is static; **movie metadata runs on serverless API** (`api/index.ts` → shared `server/apiApp.ts`). `vercel.json` rewrites `/api/*` to that function and serves the SPA from `dist/`.
 
 1. Import the GitHub repo in [Vercel](https://vercel.com) (default build: `npm run build`, output: `dist`).
 2. **Project → Settings → Environment Variables** — add for **Production** (and Preview if you want):
