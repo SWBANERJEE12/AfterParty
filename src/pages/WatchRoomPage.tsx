@@ -26,15 +26,11 @@ export function WatchRoomPage() {
 
   const party = data?.party ?? null
   const isHost = data?.isHost ?? false
-  const participants = data?.participants ?? []
   const connected = data?.connected ?? false
   const realtimeStatus = data?.realtimeStatus ?? 'idle'
   const realtimeError = data?.realtimeError
   const error = data?.error
   const membershipReady = data?.membershipReady ?? false
-  const memberKey = data?.memberKey ?? ''
-  const presenceChannel = data?.presenceChannel ?? null
-  const nickname = data?.nickname ?? 'Guest'
   const supabaseReady = isSupabaseConfigured
   const sessionJoined = Boolean(data?.membershipReady)
   const proposals = data?.proposals ?? []
@@ -180,11 +176,7 @@ export function WatchRoomPage() {
 
         <aside className="flex w-full flex-col gap-4 lg:w-80 xl:w-96">
           <VoiceChannelPanel
-            channel={presenceChannel}
-            memberKey={memberKey}
-            nickname={nickname}
             roomReady={membershipReady && supabaseReady}
-            roomParticipants={participants}
             hostMemberKey={party?.hostMemberKey ?? null}
             isHost={isHost}
             transferError={transferError}

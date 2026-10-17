@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactN
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FloatingRoomChat } from '../components/room/FloatingRoomChat'
+import { FloatingVoiceBar } from '../components/room/FloatingVoiceBar'
+import { RoomVoiceProvider } from './RoomVoiceContext'
 import { ProposalVoteModal } from '../components/room/ProposalVoteModal'
 import { SyncWatchPlayer } from '../components/room/SyncWatchPlayer'
 import { WatchPartyMiniPlayer } from '../components/room/WatchPartyMiniPlayer'
@@ -205,11 +207,21 @@ export function RoomSessionShell({ children }: Props) {
 
   return (
     <RoomSessionDataProvider value={sessionData}>
+      <RoomVoiceProvider
+        channel={watch.presenceChannel}
+        memberKey={memberKey}
+        nickname={nickname}
+        roomReady={sessionReady}
+        roomParticipants={watch.participants}
+      >
       {children}
 
       {showFullPlayer && mountEl ? createPortal(player, mountEl) : null}
       {showMinimizedPlayer ? (
-        <div className="pointer-events-none fixed -left-[9999px] top-0 h-px w-px overflow-hidden opacity-0">
+        <div
+          className="pointer-events-none fixed -left-[9999px] top-0 h-px w-px overflow-hidden opacity-0 [&_*]:!pointer-events-none"
+          aria-hidden
+        >
           {player}
         </div>
       ) : null}
@@ -232,6 +244,8 @@ export function RoomSessionShell({ children }: Props) {
           onLeave={leaveRoom}
         />
       )}
+
+      <FloatingVoiceBar />
 
       {sessionReady && (
         <FloatingRoomChat
@@ -256,6 +270,7 @@ export function RoomSessionShell({ children }: Props) {
         onClose={() => setVoteModalDismissed(votePolls.details?.poll.id ?? null)}
         onPlayTrailer={() => void handlePlayProposedTrailer()}
       />
+      </RoomVoiceProvider>
     </RoomSessionDataProvider>
   )
 }

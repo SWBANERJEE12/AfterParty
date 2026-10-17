@@ -1,15 +1,9 @@
 import { useState } from 'react'
-import type { RealtimeChannel } from '@supabase/supabase-js'
-import { useRoomVoice } from '../../hooks/useRoomVoice'
-import type { Participant } from '../../hooks/useWatchRoom'
+import { useRoomVoiceContext } from '../../room/RoomVoiceContext'
 import { colorForSlot } from '../../shared/avatarColors'
 
 type Props = {
-  channel: RealtimeChannel | null
-  memberKey: string
-  nickname: string
   roomReady: boolean
-  roomParticipants: Participant[]
   hostMemberKey: string | null
   isHost: boolean
   transferError: string | null
@@ -30,17 +24,7 @@ function AvatarInitial({ name, slot }: { name: string; slot: number }) {
   )
 }
 
-export function VoiceChannelPanel({
-  channel,
-  memberKey,
-  nickname,
-  roomReady,
-  roomParticipants,
-  hostMemberKey,
-  isHost,
-  transferError,
-  onTransferHost,
-}: Props) {
+export function VoiceChannelPanel({ roomReady, hostMemberKey, isHost, transferError, onTransferHost }: Props) {
   const {
     status,
     error,
@@ -52,7 +36,7 @@ export function VoiceChannelPanel({
     setLocalVolume,
     setLocalMuted,
     memberViews,
-  } = useRoomVoice(channel, memberKey, nickname, roomReady, roomParticipants)
+  } = useRoomVoiceContext()
 
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const busy = status === 'connecting' || status === 'disconnecting'

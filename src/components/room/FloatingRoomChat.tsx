@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { useOptionalRoomSession } from '../../room/RoomSessionContext'
 import { RoomChatPanel } from './RoomChatPanel'
 
 type Props = {
@@ -21,6 +22,12 @@ export function FloatingRoomChat({
   realtimeConnected,
   realtimeStatus,
 }: Props) {
+  const roomSession = useOptionalRoomSession()
+  const stackAboveMini =
+    Boolean(roomSession?.activeRoomId) && roomSession?.viewMode === 'minimized'
+  const fabBottom = stackAboveMini ? 'bottom-24' : 'bottom-4'
+  const panelBottom = stackAboveMini ? 'bottom-40' : 'bottom-20'
+
   const [open, setOpen] = useState(false)
   const lastReadCount = useRef(0)
   const [messageCount, setMessageCount] = useState(0)
@@ -41,7 +48,7 @@ export function FloatingRoomChat({
     <>
       {open && (
         <div
-          className="fixed bottom-20 right-4 z-50 flex max-h-[min(70vh,420px)] w-[min(100vw-2rem,360px)] flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
+          className={`fixed ${panelBottom} right-4 z-50 flex max-h-[min(70vh,420px)] w-[min(100vw-2rem,360px)] flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl`}
           role="dialog"
           aria-label="Room chat"
         >
@@ -75,7 +82,7 @@ export function FloatingRoomChat({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-lg font-bold text-white shadow-lg transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        className={`pointer-events-auto fixed ${fabBottom} right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-lg font-bold text-white shadow-lg transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50`}
         aria-label={open ? 'Close chat' : 'Open chat'}
         aria-expanded={open}
       >

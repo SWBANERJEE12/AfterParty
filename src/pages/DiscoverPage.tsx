@@ -94,7 +94,6 @@ export function DiscoverPage() {
   const [omdbOk, setOmdbOk] = useState<boolean | null>(null)
   const [omdbIssue, setOmdbIssue] = useState<'not_configured' | 'api_unreachable' | null>(null)
   const [omdbHttpStatus, setOmdbHttpStatus] = useState<number | null>(null)
-  const [featured, setFeatured] = useState<MovieMeta | null>(null)
   const [rows, setRows] = useState<Record<string, MovieMeta[]>>({})
   const [rowLoading, setRowLoading] = useState(true)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -141,8 +140,6 @@ export function DiscoverPage() {
         const map: Record<string, MovieMeta[]> = {}
         for (const row of loaded) map[row.id] = row.movies
         setRows(map)
-        const hero = map.popular?.[0] ?? loaded[0]?.movies[0]
-        if (hero) setFeatured(hero)
       })
       .finally(() => setRowLoading(false))
   }, [omdbOk])
@@ -291,34 +288,6 @@ export function DiscoverPage() {
           }
         }}
       />
-
-      {featured && (
-        <section className="relative mx-auto mt-6 max-w-6xl overflow-hidden rounded-2xl border border-[var(--color-border)]">
-          <div className="grid md:grid-cols-2">
-            <img src={posterSrc(featured)} alt="" className="max-h-96 w-full object-cover md:max-h-none md:min-h-[320px]" />
-            <div className="flex flex-col justify-end bg-gradient-to-t from-[#0f172a] to-[var(--color-surface)] p-6 md:bg-[var(--color-surface)]">
-              <p className="text-xs uppercase tracking-widest text-[var(--color-accent)]">Featured</p>
-              <h1 className="mt-2 text-2xl font-semibold text-[var(--color-fg)]">{featured.title}</h1>
-              <p className="mt-2 line-clamp-4 text-sm text-[var(--color-muted)]">{featured.overview}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <WatchTrailerButton
-                  movie={featured}
-                  loading={trailer.isLoadingMovie(featured)}
-                  trailersConfigured={trailersConfigured}
-                  onWatch={(m) => void trailer.playTrailer(m)}
-                />
-                <button
-                  type="button"
-                  onClick={() => void openDetail(featured)}
-                  className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-fg)] hover:border-[var(--color-accent)]"
-                >
-                  Details
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
 
       <div className="mx-auto mt-10 max-w-6xl space-y-10 px-4 md:px-0">
         {ROWS.map((row) => (

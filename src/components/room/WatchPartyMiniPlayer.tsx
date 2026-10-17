@@ -28,7 +28,7 @@ export function WatchPartyMiniPlayer({
     !membershipReady ? 'Not joined' : connected ? syncLabel : syncLabel || 'Disconnected'
   return (
     <div
-      className="fixed bottom-4 right-4 z-[55] flex w-[min(100vw-2rem,320px)] flex-col gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 shadow-2xl backdrop-blur-md"
+      className="pointer-events-auto fixed bottom-4 right-4 z-[55] flex w-[min(100vw-2rem,320px)] flex-col gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 shadow-2xl backdrop-blur-md"
       role="region"
       aria-label="Watch party mini player"
     >

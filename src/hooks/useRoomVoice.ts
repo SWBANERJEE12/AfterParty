@@ -297,6 +297,7 @@ export function useRoomVoice(
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
       localStreamRef.current = stream
       const ctx = ensureAudioContext()
+      if (ctx.state === 'suspended') await ctx.resume()
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 512
       const source = ctx.createMediaStreamSource(stream)
