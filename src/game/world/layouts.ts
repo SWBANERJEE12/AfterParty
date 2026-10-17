@@ -1,4 +1,4 @@
-import type { WorldLayout } from './types'
+import type { WorldLayout } from './types.js'
 
 /** Enlarged home theatre — 18×14 playable. */
 export const HOME_LAYOUT: WorldLayout = {
@@ -154,8 +154,8 @@ export const LAYOUTS: Record<string, WorldLayout> = {
 
 export function resolveSpawn(
   layout: WorldLayout,
-  from?: import('../../shared/protocol').WorldLocation,
-): import('./types').SpawnPoint {
+  from?: import('../../shared/protocol.js').WorldLocation,
+): import('./types.js').SpawnPoint {
   if (from && layout.entrySpawns?.[from]) {
     return layout.entrySpawns[from]!
   }

@@ -1,4 +1,4 @@
-import type { WorldLocation } from '../../shared/protocol'
+import type { WorldLocation } from '../../shared/protocol.js'
 
 export type { WorldLocation }
 

@@ -1,6 +1,6 @@
 import { AccessToken } from 'livekit-server-sdk'
 import type { Request, Response } from 'express'
-import { verifyRoomMember } from './supabaseAdmin'
+import { verifyRoomMember } from './supabaseAdmin.js'
 
 export function livekitConfigured(): boolean {
   return Boolean(

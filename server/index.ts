@@ -1,9 +1,9 @@
-import './loadEnv'
+import './loadEnv.js'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
-import { createApiApp } from './apiApp'
-import { AVATAR_COLORS } from '../src/shared/avatarColors'
-import { EMPTY_VOTE_STATE, type VoteState } from '../src/shared/movies'
+import { createApiApp } from './apiApp.js'
+import { AVATAR_COLORS } from '../src/shared/avatarColors.js'
+import { EMPTY_VOTE_STATE, type VoteState } from '../src/shared/movies.js'
 import type {
   ClientToServerEvents,
   JoinedRoomPayload,
@@ -11,10 +11,10 @@ import type {
   RoomErrorCode,
   ServerToClientEvents,
   WorldLocation,
-} from '../src/shared/protocol'
-import { MAX_ROOM_PLAYERS } from '../src/shared/protocol'
-import { LAYOUTS, resolveSpawn } from '../src/game/world/layouts'
-import { logServerConfigOnStartup } from './serverConfig'
+} from '../src/shared/protocol.js'
+import { MAX_ROOM_PLAYERS } from '../src/shared/protocol.js'
+import { LAYOUTS, resolveSpawn } from '../src/game/world/layouts.js'
+import { logServerConfigOnStartup } from './serverConfig.js'
 
 const PORT = Number(process.env.PORT) || 3001
 const SHORTLIST_MAX = 5

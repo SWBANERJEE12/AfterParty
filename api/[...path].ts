@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import '../server/loadEnv'
-import { createApiApp } from '../server/apiApp'
+import '../server/loadEnv.js'
+import { createApiApp } from '../server/apiApp.js'
 
 let app: ReturnType<typeof createApiApp> | undefined
 

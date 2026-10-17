@@ -1,5 +1,5 @@
-import type { MovieMeta } from '../src/shared/movies'
-import { CATALOG_IMDB_IDS } from './movieCatalog'
+import type { MovieMeta } from '../src/shared/movies.js'
+import { CATALOG_IMDB_IDS } from './movieCatalog.js'
 
 const OMDB_BASE = 'https://www.omdbapi.com/'
 

@@ -1,13 +1,13 @@
 import type { Request, Response } from 'express'
-import { fetchByImdbId } from './omdb'
-import { YOUTUBE_KEY_SETUP_HINT, getServerConfigDiagnostic } from './serverConfig'
+import { fetchByImdbId } from './omdb.js'
+import { YOUTUBE_KEY_SETUP_HINT, getServerConfigDiagnostic } from './serverConfig.js'
 import {
   TrailerApiError,
   getStaleAvailableTrailer,
   invalidateCachedTrailer,
   resolveTrailerForMovie,
   youtubeConfigured,
-} from './youtubeTrailer'
+} from './youtubeTrailer.js'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 const titleCache = new Map<string, { at: number; movie: Awaited<ReturnType<typeof fetchByImdbId>> }>()

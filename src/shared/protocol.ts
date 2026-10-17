@@ -1,4 +1,4 @@
-import type { MovieMeta, VoteState } from './movies'
+import type { MovieMeta, VoteState } from './movies.js'
 
 export const MAX_ROOM_PLAYERS = 10
 

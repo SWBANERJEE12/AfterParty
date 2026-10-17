@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
-import { CATALOG_IMDB_IDS } from './movieCatalog'
-import { fetchByImdbId, omdbConfigured, searchMoviesOmdb } from './omdb'
+import { CATALOG_IMDB_IDS } from './movieCatalog.js'
+import { fetchByImdbId, omdbConfigured, searchMoviesOmdb } from './omdb.js'
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 const cache = new Map<string, { at: number; data: unknown }>()

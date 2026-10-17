@@ -1,4 +1,4 @@
-import { isEnvSet } from './loadEnv'
+import { isEnvSet } from './loadEnv.js'
 
 const YOUTUBE_SEARCH = 'https://www.googleapis.com/youtube/v3/search'
 const YOUTUBE_VIDEOS = 'https://www.googleapis.com/youtube/v3/videos'
