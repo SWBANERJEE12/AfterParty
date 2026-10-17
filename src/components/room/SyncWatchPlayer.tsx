@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchMovieTrailer } from '../../lib/api'
+import { fetchMovieTrailer, searchOmdb } from '../../lib/api'
+import {
+  formatPlaybackStatusLabel,
+  formatPlaybackSyncLabel,
+} from '../../lib/playback/formatSyncLabel'
 import { expectedPositionSec, isStaleAction, planDriftCorrection } from '../../lib/playback/syncEngine'
 import { createYoutubePlayer, type YTPlayer } from '../../lib/playback/youtubePlayer'
 import { useHostMediaWebRTC } from '../../hooks/useHostMediaWebRTC'
@@ -72,6 +76,7 @@ export function SyncWatchPlayer({
   const ytPlayerRef = useRef<YTPlayer | null>(null)
   const [ytError, setYtError] = useState<string | null>(null)
   const [selectingTrailer, setSelectingTrailer] = useState(false)
+  const [trailerQuery, setTrailerQuery] = useState('')
   const lastActionRef = useRef({ revision: 0, actionId: null as string | null })
   const suppressLocalBroadcast = playback.applyingRemote
   const attachAfterRpcRef = useRef<{ sessionId: string; file: File } | null>(null)
@@ -189,6 +194,41 @@ export function SyncWatchPlayer({
     },
     [isHost, playback],
   )
+
+  const searchAndLoadTrailer = useCallback(async () => {
+    if (!isHost) return
+    const q = trailerQuery.trim()
+    if (!q) {
+      setYtError('Enter a movie title or IMDb id (tt…)')
+      return
+    }
+    setYtError(null)
+    if (/^tt\d{7,}$/i.test(q)) {
+      await loadTrailer({
+        id: 0,
+        imdbId: q.toLowerCase(),
+        title: q,
+        overview: '',
+        posterUrl: null,
+        releaseYear: '—',
+        trailerYoutubeKey: null,
+      })
+      return
+    }
+    setSelectingTrailer(true)
+    const { results, error } = await searchOmdb(q)
+    setSelectingTrailer(false)
+    if (error) {
+      setYtError(error)
+      return
+    }
+    const first = results.find((m) => m.imdbId)
+    if (!first) {
+      setYtError('No results — try another title')
+      return
+    }
+    await loadTrailer(first)
+  }, [isHost, trailerQuery, loadTrailer])
 
   useEffect(() => {
     const pending = attachAfterRpcRef.current
@@ -435,17 +475,23 @@ export function SyncWatchPlayer({
 
   useEffect(() => {
     if (!onPlaybackBridge) return
-    if (!membershipReady) return
     onPlaybackBridge({
       title: playback.state.movieTitle ?? 'Watch party',
-      status: playback.state.status,
-      syncLabel: playback.diag.syncStatus,
+      status: formatPlaybackStatusLabel(playback.state.status, playback.state.sourceType),
+      syncLabel: membershipReady
+        ? formatPlaybackSyncLabel(
+            playback.diag.syncStatus,
+            playback.state.sourceType,
+            realtimeConnected,
+          )
+        : 'Joining room…',
       isHost,
-      canControl: isHost && playback.state.sourceType !== 'none',
+      canControl: membershipReady && isHost && playback.state.sourceType !== 'none',
       togglePlay,
     })
   }, [
     membershipReady,
+    realtimeConnected,
     onPlaybackBridge,
     playback.state.movieTitle,
     playback.state.status,
@@ -525,6 +571,28 @@ export function SyncWatchPlayer({
           {media.hostFileName && (
             <span className="max-w-[10rem] truncate text-[10px] text-[var(--color-muted)]">{media.hostFileName}</span>
           )}
+          {sourceMode === 'trailer' && (
+            <>
+              <input
+                type="search"
+                value={trailerQuery}
+                onChange={(e) => setTrailerQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void searchAndLoadTrailer()
+                }}
+                placeholder="Search title or tt1234567"
+                className="min-w-[10rem] max-w-[14rem] flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
+              />
+              <button
+                type="button"
+                className="rounded-md bg-[#FE4401] px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                disabled={selectingTrailer}
+                onClick={() => void searchAndLoadTrailer()}
+              >
+                Load trailer
+              </button>
+            </>
+          )}
           {sourceMode === 'trailer' && proposalMovies.length > 0 && (
             <select
               className="max-w-[12rem] rounded-md border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2 py-1 text-xs"
@@ -544,6 +612,40 @@ export function SyncWatchPlayer({
         </div>
       )}
 
+      {playback.state.sourceType === 'none' && !fileLoading ? (
+        <div className="mx-3 my-4 flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 px-6 py-8 text-center">
+          <p className="text-sm font-medium text-[var(--color-fg)]">Nothing playing yet</p>
+          <p className="max-w-md text-xs text-[var(--color-muted)]">
+            {isHost
+              ? 'Search OMDb for a trailer or choose a local video file. Playback stays in this room only — browsing Discover will not change what everyone watches.'
+              : 'Waiting for the host to pick a trailer or shared video file.'}
+          </p>
+          {isHost && sourceMode === 'file' && (
+            <label className="cursor-pointer rounded-lg bg-[#FE4401] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
+              Choose video file
+              <input
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void onHostFile(f)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          )}
+          {isHost && sourceMode === 'trailer' && (
+            <button
+              type="button"
+              className="rounded-lg border border-[var(--color-border)] px-4 py-2 text-sm font-medium hover:border-[#FE4401]"
+              onClick={() => void searchAndLoadTrailer()}
+            >
+              Load trailer from search
+            </button>
+          )}
+        </div>
+      ) : (
       <VideoPlayerChrome
         durationSec={duration}
         positionSec={displayPos}
@@ -585,11 +687,6 @@ export function SyncWatchPlayer({
             preload="auto"
           />
         )}
-        {playback.state.sourceType === 'none' && !fileLoading && (
-          <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-white/70">
-            {isHost ? 'Select a trailer or video file to start synced playback.' : 'Waiting for host to choose what to watch…'}
-          </div>
-        )}
         {showViewerVideo && media.viewerFileLoadState === 'transferring' && (
           <div className="absolute inset-x-0 bottom-0 bg-black/70 p-2 text-center text-xs text-white/80">
             Receiving file… {Math.round(media.transferProgress * 100)}%
@@ -630,6 +727,7 @@ export function SyncWatchPlayer({
           </div>
         )}
       </VideoPlayerChrome>
+      )}
 
       <div className="space-y-1 border-t border-[var(--color-border)] px-3 py-2 text-[10px] text-[var(--color-muted)]">
         <div className="flex flex-wrap items-center justify-between gap-2">

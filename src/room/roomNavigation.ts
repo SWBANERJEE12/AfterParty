@@ -16,12 +16,18 @@ export function shouldAutoMinimizeRoom(
   return !isRoomRoute(pathname)
 }
 
-/** Full player portal only on the room page (not on Discover, etc.). */
-export function shouldShowFullRoomPlayer(
+/** Full player portal on the room URL whenever a session is active (ignore mini-player viewMode). */
+export function shouldShowFullRoomPlayer(activeRoomId: string | null, pathname: string): boolean {
+  if (!activeRoomId || !isRoomRoute(pathname)) return false
+  return true
+}
+
+/** Hidden off-screen player keeps sync alive only when away from the room page. */
+export function shouldRunBackgroundRoomPlayer(
   activeRoomId: string | null,
   pathname: string,
   viewMode: RoomViewMode,
 ): boolean {
-  if (!activeRoomId || !isRoomRoute(pathname)) return false
-  return viewMode === 'full' || viewMode === 'hidden'
+  if (!activeRoomId || viewMode !== 'minimized') return false
+  return !isRoomRoute(pathname)
 }

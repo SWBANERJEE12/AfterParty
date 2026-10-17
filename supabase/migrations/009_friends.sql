@@ -1,4 +1,5 @@
 -- Friends system (requires 008 profiles).
+-- Idempotent: safe to re-run after a partial SQL Editor apply.
 
 create table if not exists public.friend_requests (
   id uuid primary key default gen_random_uuid(),
@@ -23,32 +24,38 @@ create index if not exists friend_requests_to_user_idx on public.friend_requests
 alter table public.friend_requests enable row level security;
 alter table public.friendships enable row level security;
 
+drop policy if exists "friend_requests_select_involved" on public.friend_requests;
 create policy "friend_requests_select_involved"
   on public.friend_requests for select
   to authenticated
   using (auth.uid() = from_user_id or auth.uid() = to_user_id);
 
+drop policy if exists "friend_requests_insert_from_self" on public.friend_requests;
 create policy "friend_requests_insert_from_self"
   on public.friend_requests for insert
   to authenticated
   with check (auth.uid() = from_user_id and from_user_id <> to_user_id);
 
+drop policy if exists "friend_requests_update_to_user" on public.friend_requests;
 create policy "friend_requests_update_to_user"
   on public.friend_requests for update
   to authenticated
   using (auth.uid() = to_user_id or auth.uid() = from_user_id)
   with check (auth.uid() = to_user_id or auth.uid() = from_user_id);
 
+drop policy if exists "friendships_select_own" on public.friendships;
 create policy "friendships_select_own"
   on public.friendships for select
   to authenticated
   using (auth.uid() = user_id);
 
+drop policy if exists "friendships_insert_own" on public.friendships;
 create policy "friendships_insert_own"
   on public.friendships for insert
   to authenticated
   with check (auth.uid() = user_id);
 
+drop policy if exists "friendships_delete_own" on public.friendships;
 create policy "friendships_delete_own"
   on public.friendships for delete
   to authenticated

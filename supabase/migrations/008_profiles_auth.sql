@@ -1,5 +1,6 @@
 -- Profiles for Supabase Auth users (apply after 001–007).
 -- Username login uses synthetic email: lower(username) || '@auth.afterparty.local' (see src/auth/username.ts).
+-- Idempotent: safe to re-run after a partial SQL Editor apply (policies recreated).
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -17,11 +18,13 @@ create index if not exists profiles_username_lower_idx on public.profiles (lower
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "profiles_select_authenticated" on public.profiles;
 create policy "profiles_select_authenticated"
   on public.profiles for select
   to authenticated
   using (true);
 
+drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own"
   on public.profiles for update
   to authenticated

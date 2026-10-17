@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { useRoutingLocation } from './useRoutingLocation'
 import { ProtectedRoute } from '../auth/ProtectedRoute'
 import { MainLayout } from '../layouts/MainLayout'
 import { DiscoverPage } from '../pages/DiscoverPage'
@@ -15,54 +15,15 @@ import { WatchRoomPage } from '../pages/WatchRoomPage'
 import { WatchPartyCreatePage, WatchPartyJoinPage } from '../pages/WatchPartyHubPage'
 import { WelcomePage } from '../pages/WelcomePage'
 import { RoomRouteErrorBoundary } from './RoomRouteErrorBoundary'
+import { useOptionalRoomSession } from './RoomSessionContext'
 import { RoomSessionShell } from './RoomSessionShell'
 
 export function AppRoutes() {
-  const routerLocation = useLocation()
-  const [historyTick, setHistoryTick] = useState(0)
-
-  useEffect(() => {
-    const bump = () => setHistoryTick((t) => t + 1)
-    window.addEventListener('popstate', bump)
-    const pushState = history.pushState.bind(history)
-    const replaceState = history.replaceState.bind(history)
-    history.pushState = (...args) => {
-      pushState(...args)
-      bump()
-    }
-    history.replaceState = (...args) => {
-      replaceState(...args)
-      bump()
-    }
-    return () => {
-      window.removeEventListener('popstate', bump)
-      history.pushState = pushState
-      history.replaceState = replaceState
-    }
-  }, [])
-
-  const routesLocation = useMemo(() => {
-    const browserPath = window.location.pathname
-    const browserSearch = window.location.search
-    const browserHash = window.location.hash
-    if (
-      browserPath === routerLocation.pathname &&
-      browserSearch === routerLocation.search &&
-      browserHash === routerLocation.hash
-    ) {
-      return routerLocation
-    }
-    return {
-      ...routerLocation,
-      pathname: browserPath,
-      search: browserSearch,
-      hash: browserHash,
-      key: `${browserPath}${historyTick}`,
-    }
-  }, [routerLocation, historyTick])
-
+  // Re-match routes when room session changes (e.g. minimize while URL already moved).
+  useOptionalRoomSession()
+  const routeLocation = useRoutingLocation()
   return (
-    <Routes location={routesLocation}>
+    <Routes location={routeLocation}>
       <Route element={<RoomSessionShell />}>
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/sign-in" element={<SignInPage />} />

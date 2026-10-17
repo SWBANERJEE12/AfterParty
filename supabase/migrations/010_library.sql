@@ -1,4 +1,5 @@
 -- My List + watch history (owner-only via RLS).
+-- Requires 008 profiles. Idempotent: safe to re-run after a partial SQL Editor apply.
 
 create table if not exists public.my_list_items (
   id uuid primary key default gen_random_uuid(),
@@ -28,18 +29,30 @@ create index if not exists watch_history_user_last_idx on public.watch_history (
 alter table public.my_list_items enable row level security;
 alter table public.watch_history enable row level security;
 
+drop policy if exists "my_list_select_own" on public.my_list_items;
 create policy "my_list_select_own"
   on public.my_list_items for select to authenticated using (auth.uid() = user_id);
+
+drop policy if exists "my_list_insert_own" on public.my_list_items;
 create policy "my_list_insert_own"
   on public.my_list_items for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "my_list_delete_own" on public.my_list_items;
 create policy "my_list_delete_own"
   on public.my_list_items for delete to authenticated using (auth.uid() = user_id);
 
+drop policy if exists "history_select_own" on public.watch_history;
 create policy "history_select_own"
   on public.watch_history for select to authenticated using (auth.uid() = user_id);
+
+drop policy if exists "history_insert_own" on public.watch_history;
 create policy "history_insert_own"
   on public.watch_history for insert to authenticated with check (auth.uid() = user_id);
+
+drop policy if exists "history_update_own" on public.watch_history;
 create policy "history_update_own"
   on public.watch_history for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "history_delete_own" on public.watch_history;
 create policy "history_delete_own"
   on public.watch_history for delete to authenticated using (auth.uid() = user_id);

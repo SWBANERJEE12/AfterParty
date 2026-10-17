@@ -113,6 +113,36 @@ const probes: { name: string; ok: boolean; hint?: string }[] = []
   })
 }
 
+{
+  const { error: profErr } = await supabase.from('profiles').select('id').limit(0)
+  const msg = profErr?.message ?? ''
+  probes.push({
+    name: 'profiles',
+    ok: !msg.includes('schema cache') && !msg.includes('does not exist'),
+    hint: msg ? 'Apply 008_profiles_auth.sql' : undefined,
+  })
+}
+
+{
+  const { error: listErr } = await supabase.from('my_list_items').select('id').limit(0)
+  const msg = listErr?.message ?? ''
+  probes.push({
+    name: 'my_list_items',
+    ok: !msg.includes('schema cache') && !msg.includes('does not exist'),
+    hint: msg ? 'Apply 010_library.sql (after 008)' : undefined,
+  })
+}
+
+{
+  const { error: frErr } = await supabase.from('friend_requests').select('id').limit(0)
+  const msg = frErr?.message ?? ''
+  probes.push({
+    name: 'friend_requests',
+    ok: !msg.includes('schema cache') && !msg.includes('does not exist'),
+    hint: msg ? 'Apply 009_friends.sql (after 008)' : undefined,
+  })
+}
+
 const failed = probes.filter((p) => !p.ok)
 if (failed.length > 0) {
   console.error('Supabase check failed — missing database objects:')

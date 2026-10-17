@@ -51,7 +51,7 @@ export function MainLayout() {
           </button>
         </header>
         <main className={`flex-1 overflow-auto ${isRoom ? 'p-0' : 'p-4 md:p-6'}`}>
-          <Outlet />
+          <Outlet key={location.pathname} />
         </main>
       </div>
     </div>

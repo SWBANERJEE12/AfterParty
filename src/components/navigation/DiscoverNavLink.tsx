@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useOptionalRoomSession } from '../../room/RoomSessionContext'
 
 type Props = {
@@ -17,15 +17,21 @@ export function DiscoverNavLink({
   label = 'Discover',
 }: Props) {
   const roomSession = useOptionalRoomSession()
+  const navigate = useNavigate()
+  const location = useLocation()
 
   return (
     <NavLink
       to="/discover"
       className={className}
       title={label}
-      onClick={() => {
+      onClick={(e) => {
+        e.preventDefault()
         if (roomSession?.activeRoomId && roomSession.viewMode === 'full') {
           roomSession.minimizeRoom()
+        }
+        if (location.pathname !== '/discover') {
+          navigate('/discover')
         }
         onNavigate?.()
       }}

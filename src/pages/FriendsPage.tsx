@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { getSupabase } from '../lib/supabase'
+import { migrationHintForSupabaseError } from '../lib/supabaseMigrationHint'
 import type { Profile } from '../auth/types'
 
 export function FriendsPage() {
@@ -29,7 +30,7 @@ export function FriendsPage() {
       .limit(10)
     setLoading(false)
     if (err) {
-      setError(err.message.includes('does not exist') ? 'Apply migration 008_profiles_auth.sql in Supabase.' : err.message)
+      setError(migrationHintForSupabaseError(err.message) ?? err.message)
       return
     }
     setResults((data as Profile[]).filter((p) => p.id !== profile?.id))
@@ -44,14 +45,18 @@ export function FriendsPage() {
       to_user_id: toUserId,
       status: 'pending',
     })
-    if (err) setError(err.message)
+    if (err) setError(migrationHintForSupabaseError(err.message) ?? err.message)
     else setMessage('Friend request sent.')
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-semibold">Friends</h1>
-      <p className="text-sm text-[var(--color-muted)]">Search by unique username. Requires migrations 008 and 009.</p>
+      <p className="text-sm text-[var(--color-muted)]">
+        Search by unique username. Signed-in friends need{' '}
+        <code className="text-xs">008_profiles_auth.sql</code> and <code className="text-xs">009_friends.sql</code>{' '}
+        applied in Supabase.
+      </p>
       <div className="flex gap-2">
         <input
           value={query}

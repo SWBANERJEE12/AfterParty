@@ -13,6 +13,7 @@ type Props = {
 }
 
 export function WatchPartyMiniPlayer({
+  roomId,
   title,
   syncLabel,
   status,
@@ -25,7 +26,8 @@ export function WatchPartyMiniPlayer({
   onLeave,
 }: Props) {
   const truthfulSync =
-    !membershipReady ? 'Not joined' : connected ? syncLabel : syncLabel || 'Disconnected'
+    !membershipReady ? 'Joining room…' : connected ? syncLabel : syncLabel || 'Disconnected'
+  const roomLabel = roomId ? roomId : '—'
   return (
     <div
       className="pointer-events-auto fixed bottom-4 right-4 z-[55] flex w-[min(100vw-2rem,320px)] flex-col gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/95 p-3 shadow-2xl backdrop-blur-md"
@@ -37,6 +39,7 @@ export function WatchPartyMiniPlayer({
           <p className="truncate text-xs font-semibold text-[var(--color-fg)]">
             {title ?? 'Watch party'}
           </p>
+          <p className="font-mono text-[10px] text-[var(--color-muted)]">{roomLabel}</p>
           <p className="text-[10px] text-[var(--color-muted)]">
             {truthfulSync} · {status}
             {isHost ? ' · Host' : ''}

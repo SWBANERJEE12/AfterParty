@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type RefCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { FloatingRoomChat } from '../components/room/FloatingRoomChat'
 import { FloatingVoiceBar } from '../components/room/FloatingVoiceBar'
 import { RoomVoiceProvider } from './RoomVoiceContext'
@@ -16,9 +16,14 @@ import { isSupabaseConfigured } from '../lib/supabase'
 import { useStoredNickname } from '../hooks/useStoredNickname'
 import { getOrCreateMemberKey } from '../lib/session'
 import { RoomSessionDataProvider } from './RoomSessionDataContext'
-import { shouldAutoMinimizeRoom, shouldShowFullRoomPlayer } from './roomNavigation'
+import {
+  isRoomRoute,
+  shouldAutoMinimizeRoom,
+  shouldRunBackgroundRoomPlayer,
+  shouldShowFullRoomPlayer,
+} from './roomNavigation'
+import { formatPlaybackStatusLabel, formatPlaybackSyncLabel } from '../lib/playback/formatSyncLabel'
 import { useRoomSession } from './RoomSessionContext'
-import { useEffectivePathname } from './useEffectivePathname'
 
 type PlaybackBridge = {
   title: string | null
@@ -34,20 +39,37 @@ export const PLAYER_MOUNT_ID = 'watch-player-mount'
 export function RoomSessionShell() {
   const { activeRoomId, viewMode, leaveRequested, acknowledgeLeave, expandRoom, leaveRoom, minimizeRoom } =
     useRoomSession()
-  const pathname = useEffectivePathname()
+  const location = useLocation()
+  const { pathname } = location
   const navigate = useNavigate()
-  const roomId = activeRoomId ?? ''
+  const routeRoomMatch = useMatch('/room/:roomId')
+  const routeRoomId = routeRoomMatch?.params.roomId ?? null
+  const roomId = activeRoomId ?? routeRoomId ?? ''
   const { stored: nicknameStored, displayName: nicknameDisplay } = useStoredNickname()
   const nickname = nicknameStored ?? nicknameDisplay
   const joinNickname = nicknameStored ?? ''
   const memberKey = useMemo(() => getOrCreateMemberKey(), [])
   const [playbackBridge, setPlaybackBridge] = useState<PlaybackBridge | null>(null)
 
+  useLayoutEffect(() => {
+    const browserPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    const routerPath = `${location.pathname}${location.search}${location.hash}`
+    if (browserPath !== routerPath) {
+      navigate(browserPath, { replace: true })
+    }
+  })
+
   useEffect(() => {
     if (shouldAutoMinimizeRoom(activeRoomId, pathname, viewMode)) {
       minimizeRoom()
     }
   }, [activeRoomId, pathname, viewMode, minimizeRoom])
+
+  useEffect(() => {
+    if (activeRoomId && isRoomRoute(pathname)) {
+      expandRoom()
+    }
+  }, [activeRoomId, pathname, expandRoom])
 
   const watch = useWatchRoom(roomId, joinNickname, { leaveOnUnmount: false })
   const { party, isHost, transferError, transferHost, broadcastPartyRefresh } = useRoomParty(
@@ -156,19 +178,32 @@ export function RoomSessionShell() {
     })
   }, [votePolls.details, isHost, watch.presenceChannel])
 
-  const showFullPlayer = shouldShowFullRoomPlayer(activeRoomId, pathname, viewMode)
-  const showMinimizedPlayer = Boolean(activeRoomId) && viewMode === 'minimized'
+  const showFullPlayer = shouldShowFullRoomPlayer(roomId || null, pathname)
+  const showBackgroundPlayer = shouldRunBackgroundRoomPlayer(activeRoomId, pathname, viewMode)
+  const [offscreenMount, setOffscreenMount] = useState<HTMLDivElement | null>(null)
+  const onOffscreenMount: RefCallback<HTMLDivElement> = useCallback((node) => {
+    setOffscreenMount(node)
+  }, [])
   const [mountEl, setMountEl] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => {
     if (!showFullPlayer) {
       setMountEl(null)
       return
     }
-    setMountEl(document.getElementById(PLAYER_MOUNT_ID))
+    const resolveMount = () => document.getElementById(PLAYER_MOUNT_ID)
+    const el = resolveMount()
+    if (el) {
+      setMountEl(el)
+      return
+    }
+    const frame = requestAnimationFrame(() => {
+      setMountEl(resolveMount())
+    })
+    return () => cancelAnimationFrame(frame)
   }, [showFullPlayer, pathname, roomId])
 
-  if (!activeRoomId || !sessionData) {
-    return <Outlet />
+  if (!roomId || !sessionData) {
+    return <Outlet key={pathname} />
   }
 
   const player = (
@@ -196,13 +231,17 @@ export function RoomSessionShell() {
   const miniBridge: PlaybackBridge =
     playbackBridge ?? {
       title: 'Watch party',
-      status: watch.membershipReady ? 'idle' : 'joining',
-      syncLabel: connectionLabel,
+      status: watch.membershipReady
+        ? formatPlaybackStatusLabel('paused', 'none')
+        : 'Joining…',
+      syncLabel: watch.membershipReady
+        ? formatPlaybackSyncLabel('unknown', 'none', watch.connected)
+        : connectionLabel,
       isHost,
       canControl: false,
       togglePlay: () => {},
     }
-  const showMini = showMinimizedPlayer && (sessionReady || watch.realtimeStatus !== 'idle')
+  const showMini = showBackgroundPlayer
 
   return (
     <RoomSessionDataProvider value={sessionData}>
@@ -213,17 +252,17 @@ export function RoomSessionShell() {
         roomReady={sessionReady}
         roomParticipants={watch.participants}
       >
-      <Outlet />
+      <Outlet key={pathname} />
 
-      {showFullPlayer && mountEl ? createPortal(player, mountEl) : null}
-      {showMinimizedPlayer ? (
-        <div
-          className="pointer-events-none fixed -left-[9999px] top-0 h-px w-px overflow-hidden opacity-0 [&_*]:!pointer-events-none"
-          aria-hidden
-        >
-          {player}
-        </div>
-      ) : null}
+      <div
+        ref={onOffscreenMount}
+        className="pointer-events-none fixed -left-[9999px] top-0 h-px w-px overflow-hidden opacity-0 [&_*]:!pointer-events-none"
+        aria-hidden
+      />
+      {(() => {
+        const portalTarget = showFullPlayer && mountEl ? mountEl : offscreenMount
+        return portalTarget ? createPortal(player, portalTarget) : null
+      })()}
 
       {showMini && (
         <WatchPartyMiniPlayer

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { getSupabase } from '../lib/supabase'
+import { migrationHintForSupabaseError } from '../lib/supabaseMigrationHint'
 
 export function MyListPage() {
   const { profile } = useAuth()
@@ -17,8 +18,10 @@ export function MyListPage() {
       .eq('user_id', profile.id)
       .order('added_at', { ascending: false })
       .then(({ data, error: err }) => {
-        if (err) setError(err.message)
-        else setItems(data ?? [])
+        if (err) {
+          const hint = migrationHintForSupabaseError(err.message)
+          setError(hint ?? err.message)
+        } else setItems(data ?? [])
       })
   }, [profile])
 
@@ -42,6 +45,7 @@ export function MyListPage() {
 export function WatchHistoryPage() {
   const { profile } = useAuth()
   const [items, setItems] = useState<{ id: string; title: string; last_watched_at: string }[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -52,14 +56,20 @@ export function WatchHistoryPage() {
       .select('id, title, last_watched_at')
       .eq('user_id', profile.id)
       .order('last_watched_at', { ascending: false })
-      .then(({ data }) => setItems(data ?? []))
+      .then(({ data, error: err }) => {
+        if (err) {
+          const hint = migrationHintForSupabaseError(err.message)
+          setError(hint ?? err.message)
+        } else setItems(data ?? [])
+      })
   }, [profile])
 
   return (
     <div className="mx-auto max-w-4xl">
       <h1 className="text-2xl font-semibold">Watch history</h1>
       <p className="text-sm text-[var(--color-muted)]">Recorded when playback progress is saved (migration 010).</p>
-      {items.length === 0 && <p className="mt-4 text-sm text-[var(--color-muted)]">No history yet.</p>}
+      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+      {items.length === 0 && !error && <p className="mt-4 text-sm text-[var(--color-muted)]">No history yet.</p>}
       <ul className="mt-4 space-y-2">
         {items.map((i) => (
           <li key={i.id} className="glass-panel rounded-lg px-4 py-3 text-sm">

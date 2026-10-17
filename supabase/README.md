@@ -10,6 +10,9 @@ Apply **in numeric order** via Supabase Dashboard → SQL (or Supabase CLI `db p
 | `004_post_room_message_rpc.sql` | `post_room_message` RPC |
 | `005_room_movie_proposals.sql` | Room movie shortlist + RPC |
 | **`008_profiles_auth.sql`** | **`profiles` table, RLS, `handle_new_user` trigger (signed-in Profile page)** |
+| **`009_friends.sql`** | **`friend_requests`, `friendships` — Friends search & requests (requires 008)** |
+| **`010_library.sql`** | **`my_list_items`, `watch_history` — My List & Watch History (requires 008)** |
+| **`020_repair_profiles_friends_library.sql`** | **One-shot idempotent repair if 008/009/010 partially applied (policy already exists, schema cache)** |
 | `006_fix_chat_rpc_schema_reload.sql` | Superseded — use **007** instead |
 | **`007_repair_chat_rpc_functions.sql`** | Chat RPC repair + `room_messages` insert RLS (full repair) |
 | **`013_ensure_chat_rpc_text_member_key.sql`** | **Apply if chat error: `fetch_room_messages` not in schema cache** |
