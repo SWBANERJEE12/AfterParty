@@ -115,12 +115,18 @@ export function VideoPlayerChrome({
               const sec = seekFromPointer(e.clientX, rect)
               draggingRef.current = false
               setDragSec(null)
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+              }
               commit(sec)
               bumpControls()
             }}
-            onPointerCancel={() => {
+            onPointerCancel={(e) => {
               draggingRef.current = false
               setDragSec(null)
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                e.currentTarget.releasePointerCapture(e.pointerId)
+              }
             }}
           >
             <div className="absolute inset-y-0 left-0 rounded-full bg-[#FE4401]" style={{ width: `${ratio * 100}%` }} />

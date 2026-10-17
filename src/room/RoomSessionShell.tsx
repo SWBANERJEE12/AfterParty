@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { FloatingRoomChat } from '../components/room/FloatingRoomChat'
 import { FloatingVoiceBar } from '../components/room/FloatingVoiceBar'
 import { RoomVoiceProvider } from './RoomVoiceContext'
@@ -18,6 +18,7 @@ import { getOrCreateMemberKey } from '../lib/session'
 import { RoomSessionDataProvider } from './RoomSessionDataContext'
 import { shouldAutoMinimizeRoom, shouldShowFullRoomPlayer } from './roomNavigation'
 import { useRoomSession } from './RoomSessionContext'
+import { useEffectivePathname } from './useEffectivePathname'
 
 type PlaybackBridge = {
   title: string | null
@@ -30,12 +31,10 @@ type PlaybackBridge = {
 
 export const PLAYER_MOUNT_ID = 'watch-player-mount'
 
-type Props = { children: ReactNode }
-
-export function RoomSessionShell({ children }: Props) {
+export function RoomSessionShell() {
   const { activeRoomId, viewMode, leaveRequested, acknowledgeLeave, expandRoom, leaveRoom, minimizeRoom } =
     useRoomSession()
-  const location = useLocation()
+  const pathname = useEffectivePathname()
   const navigate = useNavigate()
   const roomId = activeRoomId ?? ''
   const { stored: nicknameStored, displayName: nicknameDisplay } = useStoredNickname()
@@ -45,10 +44,10 @@ export function RoomSessionShell({ children }: Props) {
   const [playbackBridge, setPlaybackBridge] = useState<PlaybackBridge | null>(null)
 
   useEffect(() => {
-    if (shouldAutoMinimizeRoom(activeRoomId, location.pathname, viewMode)) {
+    if (shouldAutoMinimizeRoom(activeRoomId, pathname, viewMode)) {
       minimizeRoom()
     }
-  }, [activeRoomId, location.pathname, viewMode, minimizeRoom])
+  }, [activeRoomId, pathname, viewMode, minimizeRoom])
 
   const watch = useWatchRoom(roomId, joinNickname, { leaveOnUnmount: false })
   const { party, isHost, transferError, transferHost, broadcastPartyRefresh } = useRoomParty(
@@ -157,7 +156,7 @@ export function RoomSessionShell({ children }: Props) {
     })
   }, [votePolls.details, isHost, watch.presenceChannel])
 
-  const showFullPlayer = shouldShowFullRoomPlayer(activeRoomId, location.pathname, viewMode)
+  const showFullPlayer = shouldShowFullRoomPlayer(activeRoomId, pathname, viewMode)
   const showMinimizedPlayer = Boolean(activeRoomId) && viewMode === 'minimized'
   const [mountEl, setMountEl] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => {
@@ -166,10 +165,10 @@ export function RoomSessionShell({ children }: Props) {
       return
     }
     setMountEl(document.getElementById(PLAYER_MOUNT_ID))
-  }, [showFullPlayer, location.pathname, roomId])
+  }, [showFullPlayer, pathname, roomId])
 
   if (!activeRoomId || !sessionData) {
-    return <>{children}</>
+    return <Outlet />
   }
 
   const player = (
@@ -214,7 +213,7 @@ export function RoomSessionShell({ children }: Props) {
         roomReady={sessionReady}
         roomParticipants={watch.participants}
       >
-      {children}
+      <Outlet />
 
       {showFullPlayer && mountEl ? createPortal(player, mountEl) : null}
       {showMinimizedPlayer ? (

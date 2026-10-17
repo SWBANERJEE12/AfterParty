@@ -197,6 +197,8 @@ export function useRoomVoice(
     [createPeerConnection, memberKey, sendSignal],
   )
 
+  const handleSignalRef = useRef<(signal: VoiceSignal) => Promise<void>>(async () => {})
+
   const handleSignal = useCallback(
     async (signal: VoiceSignal) => {
       if (signal.from === memberKey) return
@@ -285,6 +287,8 @@ export function useRoomVoice(
     },
     [connectToPeer, createPeerConnection, memberKey, sendSignal],
   )
+
+  handleSignalRef.current = handleSignal
 
   const joinVoice = useCallback(async () => {
     if (!roomReady || !channel || inVoice) return
@@ -379,14 +383,14 @@ export function useRoomVoice(
 
     const handler = (payload: { payload: VoiceSignal }) => {
       if (!active) return
-      void handleSignal(payload.payload)
+      void handleSignalRef.current(payload.payload)
     }
     channel.on('broadcast', { event: VOICE_BROADCAST_EVENT }, handler)
 
     return () => {
       active = false
     }
-  }, [channel, handleSignal, roomReady])
+  }, [channel, roomReady])
 
   useEffect(() => {
     if (!inVoice || !analyserRef.current) return
