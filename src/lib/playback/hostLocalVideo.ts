@@ -101,10 +101,6 @@ export async function loadVideoFileIntoElement(
   video.removeAttribute('src')
   video.load()
 
-  if (previousObjectUrl) {
-    URL.revokeObjectURL(previousObjectUrl)
-  }
-
   const objectUrl = URL.createObjectURL(file)
   video.srcObject = null
   video.src = objectUrl
@@ -124,6 +120,32 @@ export async function loadVideoFileIntoElement(
   }
 
   const durationSec = Number.isFinite(video.duration) ? video.duration : null
+  if (previousObjectUrl && previousObjectUrl !== objectUrl) {
+    URL.revokeObjectURL(previousObjectUrl)
+  }
+  return { ok: true, objectUrl, durationSec }
+}
+
+/** Re-bind an existing object URL after the <video> element remounts (e.g. route / portal). */
+export async function reattachVideoObjectUrl(
+  video: HTMLVideoElement,
+  objectUrl: string,
+): Promise<HostVideoLoadResult> {
+  if (!objectUrl) return { ok: false, error: 'No video source URL.' }
+  video.pause()
+  video.srcObject = null
+  video.src = objectUrl
+  video.muted = true
+  video.playsInline = true
+  try {
+    await waitForVideoEvent(video, 'loadedmetadata')
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'Could not reload video from saved source.',
+    }
+  }
+  const durationSec = Number.isFinite(video.duration) ? video.duration : null
   return { ok: true, objectUrl, durationSec }
 }
 
@@ -137,8 +159,6 @@ export async function loadVideoBlobIntoElement(
   video.pause()
   video.removeAttribute('src')
   video.load()
-  if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl)
-
   const objectUrl = URL.createObjectURL(blob)
   video.srcObject = null
   video.src = objectUrl
@@ -159,6 +179,9 @@ export async function loadVideoBlobIntoElement(
   }
 
   const durationSec = Number.isFinite(video.duration) ? video.duration : null
+  if (previousObjectUrl && previousObjectUrl !== objectUrl) {
+    URL.revokeObjectURL(previousObjectUrl)
+  }
   return { ok: true, objectUrl, durationSec }
 }
 

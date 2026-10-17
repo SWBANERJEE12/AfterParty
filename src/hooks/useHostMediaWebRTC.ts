@@ -4,6 +4,7 @@ import {
   HostVideoCommandQueue,
   loadVideoBlobIntoElement,
   loadVideoFileIntoElement,
+  reattachVideoObjectUrl,
 } from '../lib/playback/hostLocalVideo'
 import { getIceServers } from '../lib/webrtc/iceServers'
 import {
@@ -253,6 +254,8 @@ export function useHostMediaWebRTC(
             session.onMeta(ctrl)
             setHostFileName(ctrl.name)
             setTransferBytesTotal(ctrl.size)
+            setTransferBytesReceived(0)
+            setTransferProgress(0)
           } else if (ctrl.kind === 'done') {
             try {
               const session = receiveSessionRef.current
@@ -437,12 +440,44 @@ export function useHostMediaWebRTC(
     return { ok: true, durationSec: loaded.durationSec }
   }, [mediaSessionId, startHostTransfer])
 
+  const reattachHostVideoIfNeeded = useCallback(
+    async (video: HTMLVideoElement) => {
+      const file = hostSourceFileRef.current
+      const url = hostFileUrlRef.current
+      if (!file && !url) return
+      if (url && hostReadyRef.current) {
+        const loaded = await reattachVideoObjectUrl(video, url)
+        if (loaded.ok) {
+          hostFileUrlRef.current = loaded.objectUrl
+          commandQueueRef.current.setReady(true)
+          commandQueueRef.current.drain(video)
+          setHostFileLoadState('ready')
+          setHostDurationSec(loaded.durationSec)
+          setError(null)
+          return
+        }
+      }
+      if (file) {
+        pendingFileRef.current = file
+        await runAttachPendingFile()
+      }
+    },
+    [runAttachPendingFile],
+  )
+
   const setHostVideoElement = useCallback(
     (el: HTMLVideoElement | null) => {
       hostVideoElRef.current = el
-      if (el && pendingFileRef.current) void runAttachPendingFile()
+      if (!el) return
+      if (pendingFileRef.current) {
+        void runAttachPendingFile()
+        return
+      }
+      if (hostSourceFileRef.current || hostFileUrlRef.current) {
+        void reattachHostVideoIfNeeded(el)
+      }
     },
-    [runAttachPendingFile],
+    [runAttachPendingFile, reattachHostVideoIfNeeded],
   )
 
   const setViewerVideoElement = useCallback(
@@ -587,9 +622,12 @@ export function useHostMediaWebRTC(
 
       const sid = 'sessionId' in signal ? signal.sessionId : mediaSessionId ?? ''
       const remoteKey = signal.from
-      const pc = ensurePc(remoteKey, sid)
 
       if (signal.type === 'offer') {
+        if (!isHost) {
+          closePeer(remoteKey)
+        }
+        const pc = ensurePc(remoteKey, sid)
         await pc.setRemoteDescription(signal.sdp)
         const answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
@@ -600,7 +638,12 @@ export function useHostMediaWebRTC(
           sessionId: signal.sessionId,
           sdp: answer,
         })
-      } else if (signal.type === 'answer') {
+        return
+      }
+
+      const pc = ensurePc(remoteKey, sid)
+
+      if (signal.type === 'answer') {
         await pc.setRemoteDescription(signal.sdp)
       } else if (signal.type === 'ice') {
         try {
@@ -638,6 +681,7 @@ export function useHostMediaWebRTC(
     connectViewerStable,
     ensurePc,
     requestFileFromHost,
+    closePeer,
   ])
 
   return {

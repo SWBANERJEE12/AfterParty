@@ -88,7 +88,7 @@ function RowSkeleton() {
 export function DiscoverPage() {
   const navigate = useNavigate()
   const roomSession = useOptionalRoomSession()
-  const { stored: nicknameStored } = useStoredNickname()
+  const { stored: nicknameStored, displayName: nicknameDisplay } = useStoredNickname()
   const roomContext = roomSession?.activeRoomId ?? null
 
   const [omdbOk, setOmdbOk] = useState<boolean | null>(null)
@@ -104,6 +104,7 @@ export function DiscoverPage() {
   const [detail, setDetail] = useState<MovieMeta | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [proposeMsg, setProposeMsg] = useState<string | null>(null)
+  const [proposeBusy, setProposeBusy] = useState(false)
   const [trailersConfigured, setTrailersConfigured] = useState<boolean | null>(null)
   const [recommendedFocus, setRecommendedFocus] = useState<MovieMeta | null>(null)
   const trailer = useTrailerModal()
@@ -193,21 +194,22 @@ export function DiscoverPage() {
   }, [])
 
   const proposeMovie = async (movie: MovieMeta, youtubeVideoId?: string | null) => {
+    if (proposeBusy) return
     if (!roomContext) {
       setProposeMsg('Join or create a watch room first to propose a movie.')
       return
     }
-    if (!nicknameStored) {
-      setProposeMsg('Set your nickname on the watch party screen before proposing.')
-      return
-    }
+    const nickname = nicknameStored ?? nicknameDisplay
+    setProposeBusy(true)
+    setProposeMsg(null)
     const res = await proposeMovieToRoom(
       roomContext,
       getOrCreateMemberKey(),
-      nicknameStored,
+      nickname,
       movie,
       youtubeVideoId,
     )
+    setProposeBusy(false)
     setProposeMsg(res.ok ? res.message : res.error)
   }
 
@@ -260,6 +262,15 @@ export function DiscoverPage() {
         </div>
       )}
 
+      {proposeMsg && (
+        <div
+          role="status"
+          className="mx-auto mt-4 max-w-6xl rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-[var(--color-fg)]"
+        >
+          {proposeMsg}
+        </div>
+      )}
+
       <RecommendedForYouSection
         movies={recommendedMovies}
         loading={rowLoading && omdbOk !== false}
@@ -269,10 +280,10 @@ export function DiscoverPage() {
         onOpenDetails={(m) => void openDetail(m)}
         onWatchTrailer={(m) => void trailer.playTrailer(m)}
         onPropose={(m) => {
-          setProposeMsg(null)
           void proposeMovie(m, null)
         }}
         roomActive={Boolean(roomContext)}
+        proposeBusy={proposeBusy}
         trailersConfigured={trailersConfigured}
         trailerLoading={recommendedFocus ? trailer.isLoadingMovie(recommendedFocus) : false}
         onRetryLoad={() => {
@@ -396,11 +407,11 @@ export function DiscoverPage() {
                   />
                   <button
                     type="button"
-                    disabled={!roomContext}
+                    disabled={!roomContext || proposeBusy}
                     onClick={() => void proposeToRoom()}
                     className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                   >
-                    Propose to room
+                    {proposeBusy ? 'Proposing…' : 'Propose to room'}
                   </button>
                   {roomContext && (
                     <button

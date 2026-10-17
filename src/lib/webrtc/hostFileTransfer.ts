@@ -3,6 +3,16 @@
 export const FILE_CHUNK_BYTES = 64 * 1024
 export const MAX_DC_BUFFERED = 2 * 1024 * 1024
 export const CHUNK_ACK_INTERVAL = 8
+/** Full-file SHA-256 is skipped above this size to avoid blocking the main thread. */
+export const FULL_HASH_MAX_BYTES = 48 * 1024 * 1024
+
+export function sizeOnlyDigest(fileSize: number): string {
+  return `size:${fileSize}`
+}
+
+export function isSizeOnlyDigest(digest: string): boolean {
+  return digest.startsWith('size:')
+}
 const CHUNK_MAGIC = 0x4150434b // 'APCK'
 
 export type FileMetaMessage = {
@@ -117,7 +127,8 @@ export async function sendFileOverDataChannel(
 ): Promise<string> {
   await waitForOpen(dc)
   const transferId = newTransferId()
-  const digest = await sha256HexForFile(file)
+  const digest =
+    file.size > FULL_HASH_MAX_BYTES ? sizeOnlyDigest(file.size) : await sha256HexForFile(file)
   const meta: FileMetaMessage = {
     kind: 'meta',
     sessionId,
@@ -226,11 +237,20 @@ export class FileReceiveSession {
       throw new Error(this.error)
     }
     const blob = new Blob(this.chunks as BlobPart[], { type: this.meta.mime })
-    const actual = await sha256Hex(await blob.arrayBuffer())
-    if (actual !== done.sha256 || actual !== this.meta.sha256) {
-      this.state = 'error'
-      this.error = 'File integrity check failed.'
-      throw new Error(this.error)
+    if (isSizeOnlyDigest(this.meta.sha256)) {
+      const expectedSize = Number.parseInt(this.meta.sha256.slice('size:'.length), 10)
+      if (expectedSize !== this.meta.size) {
+        this.state = 'error'
+        this.error = 'File size metadata mismatch.'
+        throw new Error(this.error)
+      }
+    } else {
+      const actual = await sha256Hex(await blob.arrayBuffer())
+      if (actual !== done.sha256 || actual !== this.meta.sha256) {
+        this.state = 'error'
+        this.error = 'File integrity check failed.'
+        throw new Error(this.error)
+      }
     }
     this.state = 'ready'
     this.progress = 1

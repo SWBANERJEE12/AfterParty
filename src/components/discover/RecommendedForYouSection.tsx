@@ -14,6 +14,7 @@ type Props = {
   onWatchTrailer: (movie: MovieMeta) => void
   onPropose: (movie: MovieMeta) => void
   roomActive: boolean
+  proposeBusy?: boolean
   trailersConfigured: boolean | null
   trailerLoading: boolean
   onRetryLoad?: () => void
@@ -94,6 +95,7 @@ export function RecommendedForYouSection({
   onWatchTrailer,
   onPropose,
   roomActive,
+  proposeBusy = false,
   trailersConfigured,
   trailerLoading,
   onRetryLoad,
@@ -233,12 +235,12 @@ export function RecommendedForYouSection({
                   </button>
                   <button
                     type="button"
-                    disabled={!roomActive}
+                    disabled={!roomActive || proposeBusy}
                     title={roomActive ? 'Propose to your watch room' : 'Join a watch room to propose'}
                     onClick={() => onPropose(focusMovie)}
                     className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                   >
-                    Propose to room
+                    {proposeBusy ? 'Proposing…' : 'Propose to room'}
                   </button>
                 </div>
                 {!roomActive && (
