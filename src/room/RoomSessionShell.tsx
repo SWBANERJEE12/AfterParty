@@ -152,7 +152,19 @@ export function RoomSessionShell() {
   }, [leaveRequested, roomId, memberKey, acknowledgeLeave, navigate])
 
   const onPlaybackBridge = useCallback((bridge: PlaybackBridge) => {
-    setPlaybackBridge(bridge)
+    setPlaybackBridge((prev) => {
+      if (
+        prev &&
+        prev.title === bridge.title &&
+        prev.status === bridge.status &&
+        prev.syncLabel === bridge.syncLabel &&
+        prev.isHost === bridge.isHost &&
+        prev.canControl === bridge.canControl
+      ) {
+        return prev
+      }
+      return bridge
+    })
   }, [])
 
   const [voteModalDismissed, setVoteModalDismissed] = useState<string | null>(null)

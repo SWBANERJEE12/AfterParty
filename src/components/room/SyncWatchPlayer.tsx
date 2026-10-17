@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fetchMovieTrailer, searchOmdb } from '../../lib/api'
 import {
   formatPlaybackStatusLabel,
@@ -69,6 +69,12 @@ export function SyncWatchPlayer({
   const [sourceMode, setSourceMode] = useState<'trailer' | 'file'>('trailer')
   const [ytPlayerReady, setYtPlayerReady] = useState(false)
   const trailerLoadGenRef = useRef(0)
+  useEffect(() => {
+    return () => {
+      trailerLoadGenRef.current += 1
+      trailerLoadInFlightRef.current = false
+    }
+  }, [])
   const [hostMediaPreparing, setHostMediaPreparing] = useState(false)
   const [viewerSyncEnabled, setViewerSyncEnabled] = useState(false)
   const pendingPlaybackRef = useRef(new PendingPlaybackBuffer())
@@ -87,8 +93,12 @@ export function SyncWatchPlayer({
   )
 
   const ytContainerRef = useRef<HTMLDivElement | null>(null)
-  const [ytContainerEl, setYtContainerEl] = useState<HTMLDivElement | null>(null)
+  const [ytDomReady, setYtDomReady] = useState(false)
   const ytPlayerRef = useRef<YTPlayer | null>(null)
+  const ytPlayerVideoIdRef = useRef<string | null>(null)
+  const ytCreateGenRef = useRef(0)
+  const ytBufferingRpcAtRef = useRef(0)
+  const trailerLoadInFlightRef = useRef(false)
   const [ytError, setYtError] = useState<string | null>(null)
   const [selectingTrailer, setSelectingTrailer] = useState(false)
   const [trailerQuery, setTrailerQuery] = useState('')
@@ -186,6 +196,8 @@ export function SyncWatchPlayer({
   const loadTrailer = useCallback(
     async (movie: MovieMeta) => {
       if (!isHost || !movie.imdbId) return
+      if (trailerLoadInFlightRef.current) return
+      trailerLoadInFlightRef.current = true
       const loadGen = ++trailerLoadGenRef.current
       setSelectingTrailer(true)
       setYtError(null)
@@ -197,12 +209,17 @@ export function SyncWatchPlayer({
           setSelectingTrailer(false)
           setYtError('Trailer lookup failed. Try again.')
         }
+        trailerLoadInFlightRef.current = false
         return
       }
-      if (loadGen !== trailerLoadGenRef.current) return
+      if (loadGen !== trailerLoadGenRef.current) {
+        trailerLoadInFlightRef.current = false
+        return
+      }
       setSelectingTrailer(false)
       if (!trailer.videoId) {
         setYtError(trailer.message ?? 'Trailer unavailable')
+        trailerLoadInFlightRef.current = false
         return
       }
       const sessionId = crypto.randomUUID()
@@ -217,12 +234,13 @@ export function SyncWatchPlayer({
       if (!res.ok && loadGen === trailerLoadGenRef.current) {
         setYtError(res.error)
       }
+      trailerLoadInFlightRef.current = false
     },
     [isHost, applyHostAction],
   )
 
   const searchAndLoadTrailer = useCallback(async () => {
-    if (!isHost) return
+    if (!isHost || trailerLoadInFlightRef.current || selectingTrailer) return
     const q = trailerQuery.trim()
     if (!q) {
       setYtError('Enter a movie title or IMDb id (tt…)')
@@ -320,17 +338,37 @@ export function SyncWatchPlayer({
   const youtubeVideoId = playback.state.youtubeVideoId
   const youtubeSource = playback.state.sourceType === 'youtube_trailer'
 
-  useEffect(() => {
-    if (!youtubeSource || !youtubeVideoId) {
-      setYtPlayerReady(false)
+  const bindYtContainer = useCallback((node: HTMLDivElement | null) => {
+    ytContainerRef.current = node
+    setYtDomReady(Boolean(node))
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!youtubeSource) {
       ytPlayerRef.current?.destroy()
       ytPlayerRef.current = null
+      ytPlayerVideoIdRef.current = null
+      setYtPlayerReady(false)
+    }
+  }, [youtubeSource])
+
+  useEffect(() => {
+    if (!youtubeSource || !youtubeVideoId || !ytDomReady) return
+    const el = ytContainerRef.current
+    if (!el) return
+
+    if (ytPlayerVideoIdRef.current === youtubeVideoId && ytPlayerRef.current) {
       return
     }
-    const el = ytContainerEl
-    if (!el) return
-    let cancelled = false
+
+    ytPlayerRef.current?.destroy()
+    ytPlayerRef.current = null
+    ytPlayerVideoIdRef.current = null
     setYtPlayerReady(false)
+
+    const gen = ++ytCreateGenRef.current
+    let cancelled = false
+
     void createYoutubePlayer(el, youtubeVideoId, {
       onError: (code) => {
         if (!cancelled) setYtError(`YouTube error (${code})`)
@@ -338,34 +376,43 @@ export function SyncWatchPlayer({
       onStateChange: (st, player) => {
         if (!isHost || suppressLocalBroadcast.current) return
         const YT = window.YT?.PlayerState
-        if (!YT) return
-        if (st === YT.BUFFERING) {
-          void applyHostActionRef.current({
-            type: 'buffering',
-            positionSec: player.getCurrentTime(),
-          })
-        }
+        if (!YT || st !== YT.BUFFERING) return
+        if (playbackStateRef.current.status === 'buffering') return
+        const now = Date.now()
+        if (now - ytBufferingRpcAtRef.current < 2500) return
+        ytBufferingRpcAtRef.current = now
+        void applyHostActionRef.current({
+          type: 'buffering',
+          positionSec: player.getCurrentTime(),
+        })
       },
     })
       .then((player) => {
-        if (cancelled) {
+        if (cancelled || gen !== ytCreateGenRef.current) {
           player.destroy()
           return
         }
         ytPlayerRef.current = player
+        ytPlayerVideoIdRef.current = youtubeVideoId
         setYtPlayerReady(true)
         setYtError(null)
       })
       .catch(() => {
-        if (!cancelled) setYtError('Could not embed trailer. Try another title.')
+        if (!cancelled && gen === ytCreateGenRef.current) {
+          setYtError('Could not embed trailer. Try another title.')
+        }
       })
+
     return () => {
       cancelled = true
-      setYtPlayerReady(false)
-      ytPlayerRef.current?.destroy()
-      ytPlayerRef.current = null
+      if (gen === ytCreateGenRef.current) {
+        ytPlayerRef.current?.destroy()
+        ytPlayerRef.current = null
+        ytPlayerVideoIdRef.current = null
+        setYtPlayerReady(false)
+      }
     }
-  }, [youtubeSource, youtubeVideoId, isHost, ytContainerEl])
+  }, [youtubeSource, youtubeVideoId, isHost, ytDomReady])
 
   useEffect(() => {
     const player = ytPlayerRef.current
@@ -522,6 +569,13 @@ export function SyncWatchPlayer({
     void hostControl(playback.state.status === 'playing' ? 'pause' : 'play')
   }, [hostControl, playback.state.status])
 
+  const togglePlayRef = useRef(togglePlay)
+  togglePlayRef.current = togglePlay
+
+  const bridgeTogglePlay = useCallback(() => {
+    togglePlayRef.current()
+  }, [])
+
   useEffect(() => {
     if (!onPlaybackBridge) return
     onPlaybackBridge({
@@ -536,7 +590,7 @@ export function SyncWatchPlayer({
         : 'Joining room…',
       isHost,
       canControl: membershipReady && isHost && playback.state.sourceType !== 'none',
-      togglePlay,
+      togglePlay: bridgeTogglePlay,
     })
   }, [
     membershipReady,
@@ -547,7 +601,7 @@ export function SyncWatchPlayer({
     playback.diag.syncStatus,
     isHost,
     playback.state.sourceType,
-    togglePlay,
+    bridgeTogglePlay,
   ])
 
   const duration =
@@ -709,13 +763,7 @@ export function SyncWatchPlayer({
       >
         {playback.state.sourceType === 'youtube_trailer' && (
           <>
-            <div
-              ref={(node) => {
-                ytContainerRef.current = node
-                setYtContainerEl(node)
-              }}
-              className="absolute inset-0 h-full w-full"
-            />
+            <div ref={bindYtContainer} className="absolute inset-0 h-full w-full" />
             {!ytPlayerReady && !ytError && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 text-sm text-white/80">
                 Loading trailer…
