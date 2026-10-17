@@ -93,6 +93,7 @@ export function DiscoverPage() {
 
   const [omdbOk, setOmdbOk] = useState<boolean | null>(null)
   const [omdbIssue, setOmdbIssue] = useState<'not_configured' | 'api_unreachable' | null>(null)
+  const [omdbHttpStatus, setOmdbHttpStatus] = useState<number | null>(null)
   const [featured, setFeatured] = useState<MovieMeta | null>(null)
   const [rows, setRows] = useState<Record<string, MovieMeta[]>>({})
   const [rowLoading, setRowLoading] = useState(true)
@@ -122,9 +123,11 @@ export function DiscoverPage() {
       if (s.configured) {
         setOmdbOk(true)
         setOmdbIssue(null)
+        setOmdbHttpStatus(null)
       } else {
         setOmdbOk(false)
         setOmdbIssue(s.reason)
+        setOmdbHttpStatus(s.httpStatus ?? null)
       }
     })
     fetchTrailerStatus().then((s) => setTrailersConfigured(s.configured))
@@ -244,8 +247,11 @@ export function DiscoverPage() {
         <div className="mx-auto mt-4 max-w-6xl rounded-lg border border-amber-500/30 bg-amber-950/20 px-4 py-3 text-sm text-amber-100">
           {omdbIssue === 'api_unreachable' ? (
             <>
-              Movie API is not reachable. On Vercel, deploy with the <code>api/</code> serverless handler (see{' '}
-              <code>vercel.json</code>) and redeploy after setting environment variables.
+              Movie API is not reachable
+              {omdbHttpStatus != null ? ` (HTTP ${omdbHttpStatus})` : ''}. The browser should call same-origin{' '}
+              <code>/api/omdb/status</code> and receive JSON — if you see HTML, the Vercel function is not handling{' '}
+              <code>/api/*</code>. Redeploy after the latest <code>api/[...path].ts</code> handler is on{' '}
+              <code>master</code>.
             </>
           ) : (
             <>

@@ -2,18 +2,29 @@ import type { MovieMeta } from '../shared/movies'
 
 export type OmdbStatusResult =
   | { configured: true }
-  | { configured: false; reason: 'not_configured' | 'api_unreachable' }
+  | { configured: false; reason: 'not_configured' | 'api_unreachable'; httpStatus?: number }
 
 export async function fetchOmdbStatus(): Promise<OmdbStatusResult> {
   try {
     const res = await fetch('/api/omdb/status', { headers: { Accept: 'application/json' } })
     const contentType = res.headers.get('content-type') ?? ''
-    if (!res.ok || !contentType.includes('application/json')) {
-      return { configured: false, reason: 'api_unreachable' }
+    if (!contentType.includes('application/json')) {
+      return { configured: false, reason: 'api_unreachable', httpStatus: res.status }
     }
-    const data = (await res.json()) as { configured?: boolean }
+    let data: { configured?: boolean; ok?: boolean }
+    try {
+      data = (await res.json()) as { configured?: boolean; ok?: boolean }
+    } catch {
+      return { configured: false, reason: 'api_unreachable', httpStatus: res.status }
+    }
     if (data.configured) return { configured: true }
-    return { configured: false, reason: 'not_configured' }
+    if (res.status === 503 || data.configured === false) {
+      return { configured: false, reason: 'not_configured', httpStatus: res.status }
+    }
+    if (!res.ok) {
+      return { configured: false, reason: 'api_unreachable', httpStatus: res.status }
+    }
+    return { configured: false, reason: 'not_configured', httpStatus: res.status }
   } catch {
     return { configured: false, reason: 'api_unreachable' }
   }

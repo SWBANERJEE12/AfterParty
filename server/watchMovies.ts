@@ -24,7 +24,11 @@ export const DISCOVER_ROWS: Record<string, string[]> = {
 }
 
 export function omdbStatus(_req: Request, res: Response) {
-  res.json({ configured: omdbConfigured() })
+  res.json({
+    ok: true,
+    service: 'afterparty-api',
+    configured: omdbConfigured(),
+  })
 }
 
 export async function omdbSearch(req: Request, res: Response) {

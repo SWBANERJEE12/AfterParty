@@ -1,7 +1,8 @@
 import cors from 'cors'
 import express from 'express'
 import { CATALOG_IMDB_IDS } from './movieCatalog'
-import { fetchByImdbId, getBlockbusterShelfMovies } from './omdb'
+import { fetchByImdbId, getBlockbusterShelfMovies, omdbConfigured } from './omdb'
+import { vercelPathMiddleware } from './vercelPath'
 import { searchMovies } from './tmdb'
 import { issueLivekitToken, livekitStatus } from './livekit'
 import { createRateLimiter } from './rateLimit'
@@ -13,9 +14,20 @@ export function createApiApp() {
   const app = express()
   app.use(cors({ origin: true }))
   app.use(express.json({ limit: '32kb' }))
+  app.use(vercelPathMiddleware)
+
+  const healthPayload = () => ({
+    ok: true,
+    service: 'afterparty-api',
+    omdbConfigured: omdbConfigured(),
+  })
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true })
+    res.json(healthPayload())
+  })
+
+  app.get('/api/health', (_req, res) => {
+    res.json(healthPayload())
   })
 
   app.get('/api/time', (_req, res) => {
