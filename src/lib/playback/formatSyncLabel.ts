@@ -6,7 +6,8 @@ export function formatPlaybackSyncLabel(
   if (sourceType === 'none') return 'No video selected'
   if (syncStatus === 'synced') return 'Synced'
   if (syncStatus === 'correcting') return 'Correcting drift'
-  if (realtimeConnected) return 'Syncing'
+  if (syncStatus === 'unknown' && sourceType !== 'none' && realtimeConnected) return 'Syncing'
+  if (realtimeConnected) return 'Connecting'
   return 'Waiting for connection'
 }
 

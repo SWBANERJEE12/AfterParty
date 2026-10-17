@@ -4,7 +4,13 @@ import {
   formatPlaybackStatusLabel,
   formatPlaybackSyncLabel,
 } from '../../lib/playback/formatSyncLabel'
-import { expectedPositionSec, isStaleAction, planDriftCorrection } from '../../lib/playback/syncEngine'
+import {
+  clampPlaybackPosition,
+  expectedPositionSec,
+  needsPlayerResync,
+  planDriftCorrection,
+  playbackStatusForViewerSync,
+} from '../../lib/playback/syncEngine'
 import { createYoutubePlayer, type YTPlayer } from '../../lib/playback/youtubePlayer'
 import { useHostMediaWebRTC } from '../../hooks/useHostMediaWebRTC'
 import { useRoomPlayback } from '../../hooks/useRoomPlayback'
@@ -79,6 +85,7 @@ export function SyncWatchPlayer({
   const [viewerSyncEnabled, setViewerSyncEnabled] = useState(false)
   const pendingPlaybackRef = useRef(new PendingPlaybackBuffer())
   const viewerInitializedRef = useRef(false)
+  const viewerYoutubeSyncedRef = useRef(false)
 
   const media = useHostMediaWebRTC(
     channel,
@@ -142,9 +149,16 @@ export function SyncWatchPlayer({
     publishedReadyForSessionRef.current = null
     lastActionRef.current = { revision: 0, actionId: null }
     viewerInitializedRef.current = false
+    viewerYoutubeSyncedRef.current = false
     setViewerSyncEnabled(false)
     pendingPlaybackRef.current.clear()
   }, [playback.state.mediaSessionId])
+
+  useEffect(() => {
+    if (isHost || playback.state.sourceType !== 'youtube_trailer') return
+    if (ytPlayerReady && viewerYoutubeSyncedRef.current) return
+    pendingPlaybackRef.current.update(playback.state)
+  }, [isHost, playback.state, ytPlayerReady, playback.state.sourceType])
 
   useEffect(() => {
     if (isHost || playback.state.sourceType !== 'host_media') return
@@ -192,6 +206,18 @@ export function SyncWatchPlayer({
       off()
     }
   }, [isHost, media])
+
+  const wasRealtimeConnectedRef = useRef(false)
+  useEffect(() => {
+    if (isHost) return
+    if (realtimeConnected && !wasRealtimeConnectedRef.current) {
+      viewerYoutubeSyncedRef.current = false
+      void refreshPlaybackRef.current().then(() => {
+        void applyYoutubeAuthorityRef.current(true)
+      })
+    }
+    wasRealtimeConnectedRef.current = realtimeConnected
+  }, [realtimeConnected, isHost])
 
   const loadTrailer = useCallback(
     async (movie: MovieMeta) => {
@@ -338,6 +364,68 @@ export function SyncWatchPlayer({
   const youtubeVideoId = playback.state.youtubeVideoId
   const youtubeSource = playback.state.sourceType === 'youtube_trailer'
 
+  const applyYoutubeAuthority = useCallback(
+    async (preferFresh = false) => {
+      const player = ytPlayerRef.current
+      if (!player || !ytPlayerReady) return false
+
+      const fresh = preferFresh ? await refreshPlaybackRef.current() : null
+      const buffered = pendingPlaybackRef.current.peek()
+      const s =
+        fresh && buffered && buffered.revision > fresh.revision
+          ? buffered
+          : (fresh ?? buffered ?? playbackStateRef.current)
+
+      if (s.sourceType !== 'youtube_trailer' || !s.youtubeVideoId) return false
+      if (s.youtubeVideoId !== youtubeVideoId) return false
+
+      if (
+        !needsPlayerResync(
+          s.revision,
+          s.actionId,
+          lastActionRef.current.revision,
+          lastActionRef.current.actionId,
+          viewerYoutubeSyncedRef.current,
+        )
+      ) {
+        return true
+      }
+
+      const expected = expectedPositionSec(s, Date.now(), clockOffsetRef.current)
+      const duration = player.getDuration() || s.durationSec
+      const target = clampPlaybackPosition(expected, duration)
+      const targetStatus = playbackStatusForViewerSync(s.status)
+
+      suppressLocalBroadcast.current = true
+      player.seekTo(target, true)
+      if (targetStatus === 'playing') {
+        player.playVideo()
+      } else {
+        player.pauseVideo()
+      }
+      player.setPlaybackRate(s.playbackRate)
+      lastActionRef.current = { revision: s.revision, actionId: s.actionId }
+      viewerYoutubeSyncedRef.current = true
+      pendingPlaybackRef.current.clear()
+
+      window.setTimeout(() => {
+        const actual = player.getCurrentTime()
+        const plan = planDriftCorrection(target, actual, targetStatus, true)
+        reportDriftRef.current(
+          plan.driftMs,
+          Math.abs(plan.driftMs) <= 120 ? 'synced' : 'correcting',
+        )
+        suppressLocalBroadcast.current = false
+      }, 200)
+
+      return true
+    },
+    [youtubeVideoId, suppressLocalBroadcast],
+  )
+
+  const applyYoutubeAuthorityRef = useRef(applyYoutubeAuthority)
+  applyYoutubeAuthorityRef.current = applyYoutubeAuthority
+
   const bindYtContainer = useCallback((node: HTMLDivElement | null) => {
     ytContainerRef.current = node
     setYtDomReady(Boolean(node))
@@ -396,6 +484,9 @@ export function SyncWatchPlayer({
         ytPlayerVideoIdRef.current = youtubeVideoId
         setYtPlayerReady(true)
         setYtError(null)
+        if (!isHost) {
+          void applyYoutubeAuthorityRef.current(true)
+        }
       })
       .catch(() => {
         if (!cancelled && gen === ytCreateGenRef.current) {
@@ -415,31 +506,55 @@ export function SyncWatchPlayer({
   }, [youtubeSource, youtubeVideoId, isHost, ytDomReady])
 
   useEffect(() => {
+    if (isHost || !ytPlayerReady || playback.state.sourceType !== 'youtube_trailer') return
+    void applyYoutubeAuthority(false)
+  }, [
+    isHost,
+    ytPlayerReady,
+    playback.state.revision,
+    playback.state.actionId,
+    playback.state.status,
+    playback.state.playbackRate,
+    playback.state.sourceType,
+    playback.state.youtubeVideoId,
+    playback.clockOffsetMs,
+    applyYoutubeAuthority,
+  ])
+
+  useEffect(() => {
     const player = ytPlayerRef.current
     const s = playback.state
-    if (!player || !ytPlayerReady || s.sourceType !== 'youtube_trailer') return
+    if (!player || !ytPlayerReady || s.sourceType !== 'youtube_trailer' || !isHost) return
     if (
-      isStaleAction(s.revision, s.actionId, lastActionRef.current.revision, lastActionRef.current.actionId)
+      !needsPlayerResync(
+        s.revision,
+        s.actionId,
+        lastActionRef.current.revision,
+        lastActionRef.current.actionId,
+        true,
+      )
     ) {
       return
     }
     lastActionRef.current = { revision: s.revision, actionId: s.actionId }
     suppressLocalBroadcast.current = true
-    const expected = expectedPositionSec(s, Date.now(), playback.clockOffsetMs)
+    const expected = clampPlaybackPosition(
+      expectedPositionSec(s, Date.now(), playback.clockOffsetMs),
+      player.getDuration() || s.durationSec,
+    )
     if (s.status === 'playing') {
       player.playVideo()
       player.seekTo(expected, true)
-    } else if (s.status === 'paused') {
+    } else {
       player.pauseVideo()
       player.seekTo(expected, true)
-    } else if (s.status === 'buffering') {
-      player.pauseVideo()
     }
     player.setPlaybackRate(s.playbackRate)
     window.setTimeout(() => {
       suppressLocalBroadcast.current = false
     }, 100)
   }, [
+    isHost,
     playback.state.revision,
     playback.state.actionId,
     playback.state.status,
@@ -455,12 +570,13 @@ export function SyncWatchPlayer({
     const id = window.setInterval(() => {
       const player = ytPlayerRef.current
       const s = playbackStateRef.current
-      if (!player || !ytPlayerReady || s.sourceType !== 'youtube_trailer' || s.status === 'buffering') {
+      if (!player || !ytPlayerReady || s.sourceType !== 'youtube_trailer') {
         return
       }
+      const syncStatus = playbackStatusForViewerSync(s.status)
       const expected = expectedPositionSec(s, Date.now(), clockOffsetRef.current)
       const actual = player.getCurrentTime()
-      const plan = planDriftCorrection(expected, actual, s.status, true)
+      const plan = planDriftCorrection(expected, actual, syncStatus, true)
       reportDriftRef.current(plan.driftMs, plan.kind === 'none' ? 'synced' : 'correcting')
       if (plan.kind === 'seek' && Math.abs(plan.driftMs) > DRIFT_HARD_MS && !isHost) {
         suppressLocalBroadcast.current = true

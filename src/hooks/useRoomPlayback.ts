@@ -71,6 +71,10 @@ export function useRoomPlayback(
     const row = Array.isArray(data) && data.length > 0 ? (data[0] as PlaybackDbRow) : undefined
     const mapped = mapPlaybackRow(row, roomId)
     applyMappedState(mapped)
+    setDiag((d) => ({
+      ...d,
+      syncStatus: mapped.sourceType === 'none' ? 'unknown' : 'correcting',
+    }))
     return mapped
   }, [roomId, memberKey, applyMappedState])
 

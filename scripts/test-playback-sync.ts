@@ -3,10 +3,13 @@
  * Run: npm run test:playback-sync
  */
 import {
+  clampPlaybackPosition,
   expectedPositionSec,
   isStaleAction,
   mergePlaybackState,
+  needsPlayerResync,
   planDriftCorrection,
+  playbackStatusForViewerSync,
   shouldApplyRevision,
 } from '../src/lib/playback/syncEngine.ts'
 import { EMPTY_PLAYBACK_STATE } from '../src/shared/playback.ts'
@@ -52,6 +55,26 @@ ok('small drift no correction', drift.kind === 'none')
 
 const hard = planDriftCorrection(50, 52, 'playing', false)
 ok('large drift seeks', hard.kind === 'seek')
+
+ok('clamp position to duration', clampPlaybackPosition(200, 120) === 120)
+ok('buffering maps to paused for viewer sync', playbackStatusForViewerSync('buffering') === 'paused')
+ok('needs resync before first player sync', needsPlayerResync(3, 'a', 3, 'a', false))
+ok('skip resync when already synced same action', !needsPlayerResync(3, 'a', 3, 'a', true))
+ok('resync on newer revision', needsPlayerResync(4, 'b', 3, 'a', true))
+
+const lateJoinExpected = expectedPositionSec(
+  {
+    ...EMPTY_PLAYBACK_STATE('r'),
+    positionSec: 60,
+    authoritativeTs: Date.now() - 13_000,
+    status: 'playing',
+    playbackRate: 1,
+    revision: 10,
+  },
+  Date.now(),
+  0,
+)
+ok('late join extrapolates playing position', Math.abs(lateJoinExpected - 73) < 1)
 
 if (failed) {
   console.error(`\n${failed} failed`)

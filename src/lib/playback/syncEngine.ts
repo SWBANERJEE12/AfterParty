@@ -68,3 +68,32 @@ export function actionFromHost(
 ): Pick<RoomPlaybackState, 'actionType' | 'positionSec' | 'revision'> {
   return { actionType: type, positionSec, revision }
 }
+
+export function clampPlaybackPosition(positionSec: number, durationSec: number | null): number {
+  const pos = Math.max(0, positionSec)
+  if (durationSec != null && Number.isFinite(durationSec) && durationSec > 0) {
+    return Math.min(pos, durationSec)
+  }
+  return pos
+}
+
+/** Viewers should not stay stuck in room-level buffering without seeking. */
+export function playbackStatusForViewerSync(status: PlaybackStatus): 'playing' | 'paused' {
+  return status === 'playing' ? 'playing' : 'paused'
+}
+
+export function needsPlayerResync(
+  incomingRevision: number,
+  incomingActionId: string | null,
+  lastSyncedRevision: number,
+  lastSyncedActionId: string | null,
+  playerHasSynced: boolean,
+): boolean {
+  if (!playerHasSynced) return true
+  return !isStaleAction(
+    incomingRevision,
+    incomingActionId,
+    lastSyncedRevision,
+    lastSyncedActionId,
+  )
+}
